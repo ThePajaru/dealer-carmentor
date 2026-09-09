@@ -1,0 +1,523 @@
+@import "tailwindcss";
+
+@font-face {
+  font-family: "Bebas Neue Local";
+  src: url("/BebasNeue-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-body);
+  --font-mono: var(--font-mono);
+  --color-surface: #F0F4FF;
+  /* CarMentor landing palette */
+  --color-navy: #042152;
+  --color-mid: #6B83BA;
+  --color-ink: #526B9F;
+  --color-peri: #AABEF5;
+  --color-paper: #F7F9FF;
+  --color-verdict: #059669;
+  --color-verdict-deep: #047857;
+  /* Dealer B2B dark theme tokens (Stripe-inspired) → utilities like bg-d-surface, text-d-accent */
+  --color-d-bg: #0a0a0c;
+  --color-d-surface: #101012;
+  --color-d-surface-2: #17171a;
+  --color-d-surface-3: #202024;
+  --color-d-border: #232329;
+  --color-d-border-strong: #33333b;
+  --color-d-text: #f0f0f2;
+  --color-d-text-2: #b3b3bc;
+  --color-d-muted: #8f8f9a;
+  --color-d-dim: #63636e;
+  --color-d-accent: #AABEF5;
+  --color-d-accent-2: #8aa4f0;
+  --color-d-mid: #6B83BA;
+  --color-d-green: #34d399;
+  --color-d-amber: #fbbf24;
+  --color-d-red: #f87171;
+  --color-d-purple: #c084fc;
+  /* AutoFlip brand colors as Tailwind v4 tokens */
+  --color-autoflip-dark: var(--autoflip-dark);
+  --color-autoflip-medium: var(--autoflip-medium);
+  --color-autoflip-light: var(--autoflip-light);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  /* Aurora background animation (aurora-background.tsx) */
+  --animate-aurora: aurora 60s linear infinite;
+}
+
+:root {
+  --radius: 0.5rem;
+  /* Aurora background: palette + keyword vars usados por aurora-background.tsx */
+  --white: #ffffff;
+  --black: #000000;
+  --transparent: transparent;
+  --blue-500: #3b82f6;
+  --blue-400: #60a5fa;
+  --blue-300: #93c5fd;
+  --indigo-300: #a5b4fc;
+  --violet-200: #ddd6fe;
+  /* Light theme - white background like the Vite app */
+  --background: #ffffff;
+  --foreground: #042152; /* autoflip-dark */
+  --card: #f8fafc;       /* light card */
+  --card-foreground: #042152;
+  --popover: #ffffff;
+  --popover-foreground: #042152;
+  --primary: #6B83BA;    /* autoflip-medium */
+  --primary-foreground: #042152; /* dark text on medium blue */
+  --secondary: #AABEF5;  /* autoflip-light */
+  --secondary-foreground: #042152;
+  --muted: #f1f5f9;      /* slate-100 */
+  --muted-foreground: #64748b; /* slate-500 */
+  --accent: #6B83BA;
+  --accent-foreground: #042152;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: #ffffff;
+  --border: #e2e8f0;     /* slate-200 */
+  --input: #d1d5db;      /* slate-300 */
+  --ring: #6B83BA;
+  --chart-1: #AABEF5;
+  --chart-2: #6B83BA;
+  --chart-3: #042152;
+  --chart-4: #AABEF5;
+  --chart-5: #6B83BA;
+  --sidebar-background: #ffffff;
+  --sidebar-foreground: #042152;
+  --sidebar-primary: #6B83BA;
+  --sidebar-primary-foreground: #042152;
+  --sidebar-accent: #AABEF5;
+  --sidebar-accent-foreground: #042152;
+  --sidebar-border: #e2e8f0;
+  --sidebar-ring: #6B83BA;
+
+  /* AutoFlip brand colors */
+  --autoflip-dark: #042152;
+  --autoflip-medium: #6B83BA;
+  --autoflip-light: #AABEF5;
+}
+
+.dark {
+  --background: 220 25% 4%;
+  --foreground: 220 15% 95%;
+  --card: 220 25% 6%;
+  --card-foreground: 220 15% 95%;
+  --popover: 220 25% 6%;
+  --popover-foreground: 220 15% 95%;
+  --primary: 220 15% 95%;
+  --primary-foreground: 220 25% 4%;
+  --secondary: 220 25% 8%;
+  --secondary-foreground: 220 15% 95%;
+  --muted: 220 25% 8%;
+  --muted-foreground: 220 15% 65%;
+  --accent: 220 15% 95%;
+  --accent-foreground: 220 25% 4%;
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 220 15% 95%;
+  --border: 220 25% 12%;
+  --input: 220 25% 12%;
+  --ring: 220 15% 95%;
+  --chart-1: 220 15% 95%;
+  --chart-2: 220 35% 65%;
+  --chart-3: 220 45% 85%;
+  --chart-4: 220 15% 95%;
+  --chart-5: 220 35% 65%;
+  --sidebar-background: 220 25% 4%;
+  --sidebar-foreground: 220 15% 95%;
+  --sidebar-primary: 220 15% 95%;
+  --sidebar-primary-foreground: 220 25% 4%;
+  --sidebar-accent: 220 25% 8%;
+  --sidebar-accent-foreground: 220 15% 95%;
+  --sidebar-border: 220 25% 12%;
+  --sidebar-ring: 220 15% 95%;
+}
+
+/* AutoFlip gradients and helpers */
+.gradient-primary{background:linear-gradient(135deg,var(--autoflip-dark),var(--autoflip-medium))}
+.gradient-card{background:linear-gradient(145deg,hsl(var(--card)),hsl(var(--muted)))}
+.text-gradient{background:linear-gradient(135deg,var(--autoflip-dark),var(--autoflip-medium));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.text-gradient-light{background:linear-gradient(135deg,var(--autoflip-medium),var(--autoflip-light));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+
+/* v1 design system keyframes */
+@keyframes v1-ticker  { 0% { transform:translateX(0); } 100% { transform:translateX(-50%); } }
+@keyframes v1-floatA  { 0%,100%{transform:translate(0,0) scale(1);} 40%{transform:translate(30px,-40px) scale(1.04);} 70%{transform:translate(-15px,20px) scale(0.97);} }
+@keyframes v1-floatB  { 0%,100%{transform:translate(0,0) scale(1);} 35%{transform:translate(-30px,25px) scale(0.96);} 65%{transform:translate(20px,-15px) scale(1.05);} }
+@keyframes v1-slideUp { from { opacity:0; transform:translateY(32px); } to { opacity:1; transform:translateY(0); } }
+@keyframes v1-spin    { from { transform:rotate(0deg); } to { transform:rotate(360deg); } }
+@keyframes v1-blink   { 0%,100%{opacity:1;} 50%{opacity:0;} }
+.v1-anim  { opacity:0; animation:v1-slideUp 0.7s cubic-bezier(0.22,1,0.36,1) forwards; }
+.v1-feature:hover { background:#F0F4FF; }
+.v1-feature:hover .v1-num { color:#042152; }
+.v1-plan { transition:transform 0.25s ease, box-shadow 0.25s ease; }
+.v1-plan:hover { transform:translateY(-4px); box-shadow:0 16px 48px rgba(4,33,82,0.12); }
+.dot-grid { background-image: radial-gradient(rgba(107,131,186,0.4) 1px, transparent 1px); background-size: 28px 28px; }
+.dot-grid-dark { background-image: radial-gradient(rgba(170,190,245,0.5) 1px, transparent 1px); background-size: 28px 28px; }
+.bg-surface { background-color: #F0F4FF; }
+
+@keyframes scroll-infinite{0%{transform:translateX(0)}100%{transform:translateX(-33.333%)}}
+.animate-scroll-infinite{animation:scroll-infinite 22.5s linear infinite}
+
+@keyframes gradient-shift{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
+.animate-gradient{background-size:200% 200%;animation:gradient-shift 8s ease infinite}
+
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+.animate-float{animation:float 3s ease-in-out infinite}
+
+@keyframes shimmer{0%{background-position:-1000px 0}100%{background-position:1000px 0}}
+.animate-shimmer{animation:shimmer 3s infinite linear}
+
+/* iOS / Android conditional visibility */
+.ios-only    { display: none; }
+.android-only { display: none; }
+.is-ios     .ios-only     { display: block; }
+.is-android .android-only { display: block; }
+
+/* Mobile bottom nav safe area */
+.safe-area-pb { padding-bottom: env(safe-area-inset-bottom, 0px); }
+
+/* Add bottom padding to pages when bottom nav is visible (mobile logged-in) */
+@media (max-width: 767px) {
+  .has-bottom-nav { padding-bottom: 4rem; }
+}
+
+@keyframes pulse-slow{0%,100%{opacity:1}50%{opacity:0.4}}
+.animate-pulse-slow{animation:pulse-slow 3s cubic-bezier(0.4,0,0.6,1) infinite}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html, body {
+    /* Horizontal only. `overflow-x: hidden` makes <body> a scroll container;
+       a full `overscroll-behavior: none` here also sets the Y axis, which stops
+       vertical wheel events from chaining body → html on pages where <html> is
+       the scroller — killing scroll everywhere except over position:fixed nodes.
+       Keep it x-only so vertical scroll chains normally. */
+    overscroll-behavior-x: none;
+    overflow-x: hidden;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-body), system-ui, sans-serif;
+  }
+}
+
+/* ============================================================
+   Dealer B2B dark theme — Stripe-inspired (scoped to .dealer-root)
+   ============================================================ */
+.dealer-root{
+  position:relative;
+  height:100vh;
+  height:100dvh;
+  overflow:hidden;
+  background:#0a0a0c;
+  color:#f0f0f2;
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+  letter-spacing:-.005em;
+}
+/* Standalone public pages (runner ficha, client tracking) scroll on the root
+   itself — they have no inner scroll container like the app shell does. */
+/* overflow:visible (not auto) — this element's height is always auto/content-sized so it
+   never scrolls internally anyway; auto/scroll/hidden here would silently break `position:
+   sticky` on any descendant (a classic CSS gotcha: a non-scrolling ancestor with overflow
+   != visible still becomes the sticky containing block). visible lets the real scrolling
+   ancestor (the document, or a wrapping modal's own overflow-y:auto container) do the work,
+   while still overriding .dealer-root's overflow:hidden so content isn't clipped. */
+.dealer-root--scroll{height:auto;min-height:100vh;min-height:100dvh;overflow:visible}
+/* Kill the white rubber-band on dealer pages: the elastic overscroll glow paints
+   the root/body background, which is white in the consumer theme. Scope strictly
+   to pages that mount the dealer shell via :has(). */
+html:has(.dealer-root), body:has(.dealer-root){ background:#0a0a0c; }
+/* Runner field ficha: pure black for outdoor OLED readability. */
+html:has(.runner-black), body:has(.runner-black){ background:#000; }
+.runner-black{ background:#000; }
+.dealer-root ::selection{background:rgba(170,190,245,.18)}
+.dealer-root :focus-visible{outline:2px solid #AABEF5;outline-offset:2px;border-radius:6px}
+
+/* Aurora ambient background — CarMentor colours (periwinkle → violet) over the
+   dark base. Subtle, masked to the top-right so the UI stays legible; it only
+   replaces the flat black, everything else keeps its style. Painted on a
+   ::before so it applies to every dealer page without touching the JSX. */
+@keyframes dealer-aurora{
+  from{background-position:50% 50%, 50% 50%}
+  to{background-position:350% 50%, 350% 50%}
+}
+.dealer-root::before{
+  content:"";
+  position:absolute;
+  inset:-10%;
+  z-index:0;
+  pointer-events:none;
+  background-image:
+    repeating-linear-gradient(100deg,#0a0a0c 0%,#0a0a0c 7%,transparent 10%,transparent 12%,#0a0a0c 16%),
+    repeating-linear-gradient(100deg,#AABEF5 10%,#8aa4f0 15%,#6B83BA 20%,#c084fc 25%,#5b7fe0 30%);
+  background-size:300% 200%, 200% 100%;
+  background-position:50% 50%, 50% 50%;
+  filter:blur(30px);
+  opacity:.28;
+  will-change:transform;
+  animation:dealer-aurora 60s linear infinite;
+  -webkit-mask-image:radial-gradient(ellipse at 100% 0%, #000 10%, transparent 65%);
+  mask-image:radial-gradient(ellipse at 100% 0%, #000 10%, transparent 65%);
+}
+/* Second, slower bloom in the opposite corner for depth. */
+.dealer-root::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  z-index:0;
+  pointer-events:none;
+  background:radial-gradient(ellipse 70% 55% at 0% 100%, rgba(107,131,186,.20), transparent 60%);
+}
+/* Keep the app above the aurora; transparent surfaces let it glow through gaps. */
+.dealer-root > *{position:relative;z-index:1}
+@media (prefers-reduced-motion: reduce){
+  .dealer-root::before{animation:none}
+}
+
+/* Mono tabular figures for all numeric data */
+.d-num{font-family:var(--font-mono),ui-monospace,SFMono-Regular,Menlo,monospace;font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1;letter-spacing:0}
+
+/* Cards — flat: solid surface + hairline border, no gradients or shadows */
+.d-card{position:relative;background:var(--color-d-surface);border:1px solid var(--color-d-border);border-radius:12px}
+.d-card-hl::after{content:none}
+.d-card-int{transition:border-color .15s,background .15s}
+.d-card-int:hover{border-color:var(--color-d-border-strong);background:var(--color-d-surface-2)}
+.d-card-dashed{background:var(--color-d-surface);border:1px dashed var(--color-d-border-strong);border-radius:12px}
+
+/* Icon tile */
+.d-ic{display:grid;place-items:center;border-radius:8px;background:rgba(170,190,245,.1);color:#AABEF5}
+.d-ic-green{background:rgba(52,211,153,.12);color:#34d399}
+.d-ic-amber{background:rgba(251,191,36,.12);color:#fbbf24}
+.d-ic-purple{background:rgba(192,132,252,.12);color:#c084fc}
+.d-ic-muted{background:var(--color-d-surface-2);color:var(--color-d-muted)}
+
+/* Buttons (apply with className; !important to win over shadcn variants) */
+.d-btn-primary{background:#ededed!important;color:#0a0a0c!important;border:0!important;box-shadow:none!important;transition:background .15s}
+.d-btn-primary:hover{background:#ffffff!important}
+.d-btn-ghost{background:transparent!important;border:1px solid var(--color-d-border-strong)!important;color:var(--color-d-text-2)!important}
+.d-btn-ghost:hover{border-color:#45454f!important;color:var(--color-d-text)!important}
+.d-btn-green{background:#10b981!important;color:#04140d!important;border:0!important}
+.d-btn-green:hover{filter:brightness(1.06)}
+
+/* Inputs */
+.d-input{background:var(--color-d-surface);border:1px solid var(--color-d-border);border-radius:8px;color:var(--color-d-text)}
+.d-input::placeholder{color:var(--color-d-dim)}
+.d-input:focus{outline:none;border-color:rgba(170,190,245,.5);box-shadow:0 0 0 3px rgba(170,190,245,.12)}
+
+/* Status tags with glowing dot */
+.d-tag{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;padding:3px 10px 3px 8px;border-radius:999px;line-height:1.7;white-space:nowrap}
+.d-tag::before{content:"";width:6px;height:6px;border-radius:50%;flex:none}
+.d-tag-info{color:#c4d2fb;background:rgba(170,190,245,.1);border:1px solid rgba(170,190,245,.28)} .d-tag-info::before{background:#AABEF5}
+.d-tag-warn{color:#fcd34d;background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.28)} .d-tag-warn::before{background:#fbbf24}
+.d-tag-good{color:#6ee7b7;background:rgba(52,211,153,.12);border:1px solid rgba(52,211,153,.28)} .d-tag-good::before{background:#34d399}
+.d-tag-muted{color:var(--color-d-muted);background:var(--color-d-surface-2);border:1px solid var(--color-d-border)} .d-tag-muted::before{background:var(--color-d-dim)}
+.d-tag-purple{color:#e2c5fd;background:rgba(192,132,252,.12);border:1px solid rgba(192,132,252,.28)} .d-tag-purple::before{background:#c084fc}
+
+/* Delta chips */
+.d-chip{display:inline-flex;align-items:center;gap:3px;font-size:11.5px;font-weight:600;padding:3px 8px;border-radius:999px}
+.d-chip-up{color:#34d399;background:rgba(52,211,153,.12)}
+.d-chip-down{color:#f87171;background:rgba(248,113,113,.12)}
+.d-chip-flat{color:var(--color-d-dim);background:var(--color-d-surface-2)}
+
+/* Links */
+.d-link{color:#AABEF5;transition:color .15s}
+.d-link:hover{color:#c7d4fb}
+
+/* Tiny pill (spec chips on cards) */
+.d-pill{display:inline-flex;align-items:center;font-size:11px;padding:2px 8px;border-radius:6px;background:var(--color-d-surface-2);color:var(--color-d-text-2);border:1px solid var(--color-d-border)}
+
+/* Data tables */
+.d-table{width:100%;border-collapse:collapse}
+.d-table thead th{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--color-d-dim);text-align:left;font-weight:600;padding:11px 18px;background:var(--color-d-surface-2);border-bottom:1px solid rgba(255,255,255,.05)}
+.d-table thead th.r{text-align:right}
+.d-table tbody td{padding:13px 18px;font-size:13.5px;border-bottom:1px solid rgba(255,255,255,.05);vertical-align:middle}
+.d-table tbody td.r{text-align:right}
+.d-table tbody tr:last-child td{border-bottom:none}
+.d-table tbody tr{transition:background .12s}
+.d-table tbody tr:hover{background:rgba(170,190,245,.035)}
+
+/* Sidebar */
+.d-side{position:relative;width:232px;flex-shrink:0;min-height:100vh;display:flex;flex-direction:column;background:var(--color-d-bg);border-right:1px solid var(--color-d-border);transition:width .2s ease}
+/* Clickable right-edge handle — toggles collapse. Desktop only. */
+.d-side-edge{display:none;position:absolute;top:0;right:-4px;width:9px;height:100%;z-index:20;padding:0;border:0;background:transparent;cursor:pointer}
+.d-side-edge::after{content:"";position:absolute;top:0;right:4px;width:2px;height:100%;background:transparent;transition:background .15s}
+.d-side-edge:hover::after,.d-side-edge:focus-visible::after{background:rgba(255,255,255,.12)}
+@media (min-width:768px){ .d-side-edge{display:block} }
+/* Collapsed icon-rail — desktop only; the mobile drawer always renders full. */
+@media (min-width:768px){
+  .d-side.collapsed{width:60px}
+  .d-side.collapsed .d-collapse-hide{display:none}
+  .d-side.collapsed .d-navitem{justify-content:center;padding-left:0;padding-right:0}
+  .d-side.collapsed .d-side-header > a{justify-content:center}
+  .d-side.collapsed .d-side-header{padding-left:0;padding-right:0}
+}
+.d-navitem{position:relative;display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;font-size:13px;font-weight:500;color:var(--color-d-muted);transition:background .15s,color .15s;cursor:pointer}
+/* Larger touch targets + comfortable text on mobile only — desktop density unchanged. */
+@media (max-width:767px){ .d-navitem{padding:13px 13px;min-height:44px;font-size:14px} }
+.d-navitem svg{opacity:.9;transition:color .15s,opacity .15s}
+.d-navitem:hover{background:var(--color-d-surface-2);color:var(--color-d-text)}
+.d-navitem:hover svg{opacity:1}
+.d-navitem.active{background:rgba(170,190,245,.1);color:#cdd9fb}
+.d-navitem.active svg{color:#AABEF5;opacity:1}
+/* Inset accent bar — anchored to the row's own left edge so it never clips or
+   detaches if the nav container padding changes. */
+.d-navitem.active::before{content:"";position:absolute;left:0;top:50%;transform:translateY(-50%);width:3px;height:20px;border-radius:0 3px 3px 0;background:#AABEF5}
+.d-cap{font-size:11px;font-weight:600;letter-spacing:.08em;color:var(--color-d-dim);text-transform:uppercase}
+
+/* Avatar gradients */
+.d-av{display:grid;place-items:center;font-weight:700;color:#0b0f17}
+.d-av-1{background:linear-gradient(150deg,#AABEF5,#6B83BA)}
+.d-av-2{background:linear-gradient(150deg,#7dd3fc,#3b82f6)}
+.d-av-3{background:linear-gradient(150deg,#6ee7b7,#10b981)}
+.d-av-4{background:linear-gradient(150deg,#cbd5e1,#94a3b8)}
+.d-av-5{background:linear-gradient(150deg,#c4b5fd,#8b5cf6)}
+.d-av-6{background:linear-gradient(150deg,#fcd34d,#f59e0b)}
+
+/* Usage meter */
+.d-bar{height:6px;border-radius:999px;background:var(--color-d-surface-2);overflow:hidden}
+.d-bar>i{display:block;height:100%;border-radius:999px;background:var(--color-d-accent);transition:width .4s cubic-bezier(.4,0,.2,1),background .3s}
+/* Usage severity — driven by a `warn`/`danger` modifier on .d-bar */
+.d-bar.warn>i{background:#fbbf24}
+.d-bar.danger>i{background:#f87171}
+
+/* ── "Analizando" magic: skeleton shimmer, indeterminate bar, aurora glow and a
+   staged pipeline. Used by the dealer Analizar workbench while an analysis streams. ── */
+@keyframes d-shimmer{0%{background-position:-180% 0}100%{background-position:180% 0}}
+.d-shimmer{
+  background:linear-gradient(100deg,var(--color-d-surface-2) 30%,var(--color-d-surface-3) 50%,var(--color-d-surface-2) 70%);
+  background-size:200% 100%;animation:d-shimmer 1.6s ease-in-out infinite;
+}
+
+@keyframes d-indet{0%{left:-35%;width:35%}55%{width:55%}100%{left:100%;width:35%}}
+.d-indet{position:relative;height:3px;border-radius:999px;background:var(--color-d-surface-2);overflow:hidden}
+.d-indet::after{content:"";position:absolute;top:0;bottom:0;left:-35%;width:35%;border-radius:999px;
+  background:linear-gradient(90deg,transparent,var(--color-d-accent),transparent);animation:d-indet 1.35s ease-in-out infinite}
+
+/* Soft accent aurora that drifts behind an analyzing row. */
+@keyframes d-aurora{0%,100%{transform:translate3d(-8%,0,0)}50%{transform:translate3d(8%,0,0)}}
+.d-analyzing{position:relative;isolation:isolate}
+.d-analyzing::before{content:"";position:absolute;inset:-1px;z-index:-1;pointer-events:none;
+  background:radial-gradient(55% 130% at 18% 0%,rgba(170,190,245,.11),transparent 72%),
+             radial-gradient(45% 120% at 85% 100%,rgba(138,164,240,.08),transparent 70%);
+  animation:d-aurora 4.5s ease-in-out infinite}
+
+/* Pipeline stage node: pending → active (pulsing accent ring) → done. */
+@keyframes d-stage-pulse{0%,100%{box-shadow:0 0 0 0 rgba(170,190,245,.45)}50%{box-shadow:0 0 0 5px rgba(170,190,245,0)}}
+.d-stage{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:500;color:var(--color-d-dim);transition:color .3s;flex:0 0 auto;white-space:nowrap}
+.d-stage-ic{display:grid;place-items:center;width:22px;height:22px;border-radius:999px;flex:0 0 auto;
+  background:var(--color-d-surface-2);color:var(--color-d-dim);border:1px solid var(--color-d-border);transition:background .3s,color .3s,border-color .3s}
+.d-stage.is-active{color:var(--color-d-text)}
+.d-stage.is-active .d-stage-ic{background:rgba(170,190,245,.14);color:var(--color-d-accent);border-color:transparent;animation:d-stage-pulse 1.6s ease-in-out infinite}
+.d-stage.is-done{color:var(--color-d-text-2)}
+.d-stage.is-done .d-stage-ic{background:rgba(52,211,153,.15);color:var(--color-d-green);border-color:transparent}
+/* Connector line between stage nodes */
+.d-stage-line{flex:1;height:1px;background:var(--color-d-border);margin:0 2px;transition:background .3s;min-width:8px}
+.d-stage-line.is-done{background:color-mix(in srgb,var(--color-d-green) 55%,transparent)}
+
+/* ── Print: turn the dark dealer theme into a clean white document (used by the
+   presupuesto "Descargar PDF" via the browser's print-to-PDF). Flips the theme
+   tokens to light so every text-d-* / bg-d-* utility follows, and overrides the
+   few hardcoded rules (.dealer-root, .d-card). ── */
+@media print {
+  html, body { background:#fff !important; }
+  .no-print { display:none !important; }
+  @page { margin: 14mm; }
+
+  .dealer-root {
+    height:auto !important; overflow:visible !important;
+    background:#fff !important; color:#111827 !important;
+    --color-d-bg:#ffffff; --color-d-surface:#ffffff; --color-d-surface-2:#f4f5f7; --color-d-surface-3:#eef0f3;
+    --color-d-border:#e5e7eb; --color-d-border-strong:#d1d5db;
+    --color-d-text:#111827; --color-d-text-2:#374151; --color-d-muted:#6b7280; --color-d-dim:#9ca3af;
+    --color-d-accent:#2952cc; --color-d-green:#059669;
+  }
+  .dealer-root .d-card, .dealer-root .d-card-hl {
+    background:#fff !important; border:1px solid #e5e7eb !important; box-shadow:none !important;
+    break-inside: avoid;
+  }
+  /* let horizontal photo strips wrap onto the page instead of clipping */
+  .print-wrap { overflow:visible !important; flex-wrap:wrap !important; }
+}
+
+/* no-op: trivial commit (13) */
+
+/* ── card-fan-carousel (SocialCards) ──────────────────────────────
+   El componente posiciona las tarjetas con transforms de GSAP en rem
+   desde el centro; el tamaño base de cada tarjeta vive aquí. Reels 9:16. */
+.fan-layout { position: relative; height: 38rem; }
+.fan-card {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 21rem;
+  height: 37rem;
+  margin-left: -10.5rem;
+  margin-top: -18.5rem;
+  border-radius: 1.5rem;
+  overflow: hidden;
+  will-change: transform;
+  background: #000;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
+}
+@media (max-width: 1023px) {
+  .fan-layout { height: 34rem; }
+  .fan-card { width: 18.5rem; height: 33rem; margin-left: -9.25rem; margin-top: -16.5rem; }
+}
+@media (max-width: 767px) {
+  .fan-layout { height: 28rem; }
+  .fan-card { width: 15.2rem; height: 27rem; margin-left: -7.6rem; margin-top: -13.5rem; border-radius: 1.25rem; }
+}
+@media (max-width: 639px) {
+  .fan-layout { height: 26rem; }
+  .fan-card { width: 14rem; height: 25rem; margin-left: -7rem; margin-top: -12.5rem; }
+}
+@media (max-width: 479px) {
+  .fan-layout { height: 22rem; }
+  .fan-card { width: 11.8rem; height: 21rem; margin-left: -5.9rem; margin-top: -10.5rem; border-radius: 1rem; }
+}
+
+/* Aurora background keyframes (aurora-background.tsx / --animate-aurora) */
+@keyframes aurora {
+  from { background-position: 50% 50%, 50% 50%; }
+  to { background-position: 350% 50%, 350% 50%; }
+}
