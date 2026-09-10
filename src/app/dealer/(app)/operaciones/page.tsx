@@ -858,14 +858,21 @@ export default function OperacionesPage() {
                         </td>
                       </tr>
                     )}
-                    {g.filas.map(j => {
+                    {g.filas.map((j, fila) => {
                       const def = stageDef(j.stage);
                       const marcada = selected.has(j.id);
+                      // Franjas alternas: con doce columnas el ojo se pierde de
+                      // lado a lado. El indice va por grupo, asi el desglose no
+                      // rompe la alternancia.
+                      const franja = fila % 2 === 1;
                       const t = tramitesDe.get(j.id) || { impuestos: 'none' as TramiteState, ficha: 'none' as TramiteState };
                       const dot = def?.dot || DOT_WAIT;
                       const esperando = dot === DOT_MOVING || dot === DOT_WAIT;
                       return (
-                        <tr key={j.id} className={marcada ? 'bg-d-accent/[0.07]' : undefined}>
+                        <tr
+                          key={j.id}
+                          className={marcada ? 'bg-d-accent/[0.07]' : franja ? 'bg-[#edf1f8]' : undefined}
+                        >
                           <td className="pr-0">
                             <input
                               type="checkbox"
@@ -969,14 +976,14 @@ export default function OperacionesPage() {
                 </tr>
               </thead>
               <tbody>
-                {impuestos.map(o => {
+                {impuestos.map((o, fila) => {
                   const p = o.payload as {
                     coche?: string; region_label?: string; municipio?: string; provincia?: string;
                     cvf?: number; valoracion?: number; co2?: number; iedmt_estimado?: number;
                   };
                   const files = o.result?.files || [];
                   return (
-                    <tr key={o.id}>
+                    <tr key={o.id} className={fila % 2 === 1 ? 'bg-[#edf1f8]' : undefined}>
                       <td className="min-w-[220px]">
                         <Link href={`/dealer/clientes/${o.request_id}`} className="font-semibold text-d-text hover:text-d-accent">
                           {p.coche || 'Vehículo'}
@@ -1044,7 +1051,7 @@ export default function OperacionesPage() {
                 </tr>
               </thead>
               <tbody>
-                {fichas.map(o => {
+                {fichas.map((o, fila) => {
                   const p = o.payload as { coche?: string; photos?: unknown[]; faltan?: string[] };
                   const hechas = Array.isArray(p.photos) ? p.photos.length : 0;
                   const faltan = Array.isArray(p.faltan) ? p.faltan.length : 0;
@@ -1052,7 +1059,7 @@ export default function OperacionesPage() {
                   const pct = total > 0 ? Math.round((hechas / total) * 100) : 0;
                   const files = o.result?.files || [];
                   return (
-                    <tr key={o.id}>
+                    <tr key={o.id} className={fila % 2 === 1 ? 'bg-[#edf1f8]' : undefined}>
                       <td className="min-w-[220px]">
                         <Link href={`/dealer/clientes/${o.request_id}`} className="font-semibold text-d-text hover:text-d-accent">
                           {p.coche || 'Vehículo'}

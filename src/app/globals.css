@@ -360,7 +360,9 @@ html:has(.runner-black), body:has(.runner-black){ background:#000; }
 .d-table tbody td.r{text-align:right}
 .d-table tbody tr:last-child td{border-bottom:none}
 .d-table tbody tr{transition:background .12s}
-.d-table tbody tr:hover{background:#f8faff}
+/* El hover tiene que ganarle a la franja alterna, si no la fila que señalas se
+   ve mas clara que sus vecinas. */
+.d-table tbody tr:hover{background:#e9f0fd}
 
 /* Sidebar */
 .d-side{position:relative;width:232px;flex-shrink:0;min-height:100vh;display:flex;flex-direction:column;background:var(--color-d-surface);border-right:1px solid var(--color-d-border);transition:width .2s ease}
