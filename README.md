@@ -90,6 +90,63 @@ redirects en la app de consumo antes de retirar `/dealer` de allí.
 
 ---
 
+## 3.5 Trámites: gestor e ingeniero (añadido el 2026-09-09)
+
+Sobre una operación ya guardada se pueden encargar dos servicios que hacemos
+nosotros, cobrados **por encargo** (Stripe one-off, no van en la cuota):
+
+| Servicio | Quién | Qué entrega |
+|---|---|---|
+| Impuestos de matriculación | gestor | Modelo 576 (IEDMT) e IVTM presentados y pagados |
+| Ficha técnica reducida | ingeniero | Ficha firmada con las fotos del checklist del runner |
+
+- Pipeline: fase nueva **Trámites** (`stage = 'tramites'`, entre `transito` y
+  `entregado`). Una operación entra ahí sola cuando el webhook confirma el pago.
+- El expediente de la ficha **no es una lista aparte**: sale de las fotos
+  marcadas `ficha: true` en `src/lib/dealer/inspection-master.ts`, que el runner
+  ya saca en su pasada normal.
+- El **precio nunca está escrito en el código**: se lee del price de Stripe en
+  `/api/dealer/services` y se cachea 10 min. Sin price configurado, la UI enseña
+  el servicio sin botón de pago (no revienta).
+- El 576 que se muestra antes de encargar es una **estimación** (`src/lib/iedmt.ts`);
+  el importe real lo fija Hacienda. El IVTM depende de la ordenanza municipal y
+  lo calcula el gestor — aquí solo se recogen municipio y CVF.
+
+Para ponerlo en marcha hacen falta **dos price nuevos en Stripe** (pago único) y
+sus variables: `STRIPE_SERVICE_IMPUESTOS_PRICE_ID` y `STRIPE_SERVICE_FICHA_PRICE_ID`.
+El aviso interno al gestor/ingeniero sale por Brevo a `DEALER_LEADS_EMAIL`: sin
+`BREVO_API_KEY` un trámite se paga y **nadie se entera**.
+
+Esquema (aplicado ya en Supabase, y en `supabase/migrations/`): tabla
+`dealer_service_orders` + el CHECK de `dealer_client_requests.stage` ampliado con
+`'tramites'`.
+
+## 3.6 Panel de colaborador (`/admin/tramites`)
+
+Donde el gestor y el ingeniero resuelven los encargos. Mismo tema oscuro que la
+app del dealer, sin sidebar ni paywall: aquí no hay perfil de dealer.
+
+- **Acceso**: lista blanca por correo en `ADMIN_EMAILS` (separados por comas).
+  No hay tabla de roles. **Variable vacía = nadie entra**: un despiste de
+  configuración cierra el panel, nunca lo abre.
+- **Qué hace**: cola de trámites pagados de todos los dealers, con lo que el
+  dealer aportó (para impuestos: comunidad, municipio, CVF, valoración, CO2,
+  576 estimado; para la ficha: las fotos del runner). Estados a mano:
+  `en_tramite`, `completado`, `cancelado` — `pagado` solo lo pone Stripe.
+- **Documentos**: se suben a `dealer-tramites`, un bucket **privado** (los otros
+  tres del proyecto son públicos a propósito). En la base solo se guarda la ruta;
+  la API entrega URLs firmadas de 1 h. Justificantes y fichas llevan datos
+  fiscales y del titular.
+- Al **completar**, el dealer recibe un correo con la nota y ve los documentos en
+  su operación.
+
+### `/login` (creado el 2026-09-09)
+
+Al separar el dealer, `/login` se quedó en el monolito, pero la app del dealer,
+el onboarding y este panel redirigen ahí: **el proyecto no tenía puerta**. Ahora
+existe, con correo y contraseña (`useAuth.signIn` / `signUp`). Sin recuperación
+de contraseña todavía.
+
 ## 4. Decisiones tomadas al separar
 
 - **Las rutas siguen siendo `/dealer/*`.** `dealer.carmentor.es/dealer/operaciones`

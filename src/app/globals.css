@@ -24,24 +24,28 @@
   --color-paper: #F7F9FF;
   --color-verdict: #059669;
   --color-verdict-deep: #047857;
-  /* Dealer B2B dark theme tokens (Stripe-inspired) → utilities like bg-d-surface, text-d-accent */
-  --color-d-bg: #0a0a0c;
-  --color-d-surface: #101012;
-  --color-d-surface-2: #17171a;
-  --color-d-surface-3: #202024;
-  --color-d-border: #232329;
-  --color-d-border-strong: #33333b;
-  --color-d-text: #f0f0f2;
-  --color-d-text-2: #b3b3bc;
-  --color-d-muted: #8f8f9a;
-  --color-d-dim: #63636e;
-  --color-d-accent: #AABEF5;
-  --color-d-accent-2: #8aa4f0;
+  /* Dealer B2B light theme tokens -> utilidades como bg-d-surface, text-d-accent.
+     En claro desde el 2026-09-10: el panel pasa a fondo blanco con la mecanica
+     del administrador de anuncios. Los grises llevan sesgo azul (no gris de
+     fabrica) para que casen con el azul de marca. El runner mantiene su tema
+     negro aparte (.runner-black): es un movil a pleno sol en Alemania. */
+  --color-d-bg: #f2f4f8;
+  --color-d-surface: #ffffff;
+  --color-d-surface-2: #f2f4f8;
+  --color-d-surface-3: #e8ecf4;
+  --color-d-border: #dde2ec;
+  --color-d-border-strong: #c6cede;
+  --color-d-text: #042152;
+  --color-d-text-2: #2c3a55;
+  --color-d-muted: #55688c;
+  --color-d-dim: #7c8aa6;
+  --color-d-accent: #2b5bd7;
+  --color-d-accent-2: #1f49b8;
   --color-d-mid: #6B83BA;
-  --color-d-green: #34d399;
-  --color-d-amber: #fbbf24;
-  --color-d-red: #f87171;
-  --color-d-purple: #c084fc;
+  --color-d-green: #0a7f5c;
+  --color-d-amber: #a8620a;
+  --color-d-red: #c0343c;
+  --color-d-purple: #7c3aed;
   /* AutoFlip brand colors as Tailwind v4 tokens */
   --color-autoflip-dark: var(--autoflip-dark);
   --color-autoflip-medium: var(--autoflip-medium);
@@ -240,15 +244,15 @@
 }
 
 /* ============================================================
-   Dealer B2B dark theme — Stripe-inspired (scoped to .dealer-root)
+   Dealer B2B light theme (scoped a .dealer-root)
    ============================================================ */
 .dealer-root{
   position:relative;
   height:100vh;
   height:100dvh;
   overflow:hidden;
-  background:#0a0a0c;
-  color:#f0f0f2;
+  background:var(--color-d-bg);
+  color:var(--color-d-text-2);
   -webkit-font-smoothing:antialiased;
   text-rendering:optimizeLegibility;
   letter-spacing:-.005em;
@@ -265,77 +269,60 @@
 /* Kill the white rubber-band on dealer pages: the elastic overscroll glow paints
    the root/body background, which is white in the consumer theme. Scope strictly
    to pages that mount the dealer shell via :has(). */
-html:has(.dealer-root), body:has(.dealer-root){ background:#0a0a0c; }
+html:has(.dealer-root), body:has(.dealer-root){ background:#f2f4f8; }
 /* Runner field ficha: pure black for outdoor OLED readability. */
 html:has(.runner-black), body:has(.runner-black){ background:#000; }
 .runner-black{ background:#000; }
-.dealer-root ::selection{background:rgba(170,190,245,.18)}
-.dealer-root :focus-visible{outline:2px solid #AABEF5;outline-offset:2px;border-radius:6px}
+.dealer-root ::selection{background:rgba(43,91,215,.16)}
+.dealer-root :focus-visible{outline:2px solid #2b5bd7;outline-offset:2px;border-radius:6px}
 
-/* Aurora ambient background — CarMentor colours (periwinkle → violet) over the
-   dark base. Subtle, masked to the top-right so the UI stays legible; it only
-   replaces the flat black, everything else keeps its style. Painted on a
-   ::before so it applies to every dealer page without touching the JSX. */
-@keyframes dealer-aurora{
-  from{background-position:50% 50%, 50% 50%}
-  to{background-position:350% 50%, 350% 50%}
-}
+/* Lavado ambiental — periwinkle y violeta de marca sobre el blanco. Casi
+   imperceptible y masajeado a las esquinas, para que las tablas se queden
+   limpias. Va en un ::before, así lo hereda toda página dealer sin tocar JSX. */
 .dealer-root::before{
   content:"";
   position:absolute;
-  inset:-10%;
+  inset:0;
   z-index:0;
   pointer-events:none;
-  background-image:
-    repeating-linear-gradient(100deg,#0a0a0c 0%,#0a0a0c 7%,transparent 10%,transparent 12%,#0a0a0c 16%),
-    repeating-linear-gradient(100deg,#AABEF5 10%,#8aa4f0 15%,#6B83BA 20%,#c084fc 25%,#5b7fe0 30%);
-  background-size:300% 200%, 200% 100%;
-  background-position:50% 50%, 50% 50%;
-  filter:blur(30px);
-  opacity:.28;
-  will-change:transform;
-  animation:dealer-aurora 60s linear infinite;
-  -webkit-mask-image:radial-gradient(ellipse at 100% 0%, #000 10%, transparent 65%);
-  mask-image:radial-gradient(ellipse at 100% 0%, #000 10%, transparent 65%);
+  /* En claro el aurora se vuelve un lavado casi imperceptible en la esquina
+     superior derecha: da profundidad sin ensuciar el blanco de las tablas. */
+  background:
+    radial-gradient(ellipse 60% 50% at 100% 0%, rgba(170,190,245,.22), transparent 62%),
+    radial-gradient(ellipse 50% 45% at 88% 8%, rgba(124,58,237,.05), transparent 60%);
 }
-/* Second, slower bloom in the opposite corner for depth. */
 .dealer-root::after{
   content:"";
   position:absolute;
   inset:0;
   z-index:0;
   pointer-events:none;
-  background:radial-gradient(ellipse 70% 55% at 0% 100%, rgba(107,131,186,.20), transparent 60%);
+  background:radial-gradient(ellipse 70% 55% at 0% 100%, rgba(107,131,186,.10), transparent 60%);
 }
-/* Keep the app above the aurora; transparent surfaces let it glow through gaps. */
 .dealer-root > *{position:relative;z-index:1}
-@media (prefers-reduced-motion: reduce){
-  .dealer-root::before{animation:none}
-}
-
 /* Mono tabular figures for all numeric data */
 .d-num{font-family:var(--font-mono),ui-monospace,SFMono-Regular,Menlo,monospace;font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1;letter-spacing:0}
 
 /* Cards — flat: solid surface + hairline border, no gradients or shadows */
-.d-card{position:relative;background:var(--color-d-surface);border:1px solid var(--color-d-border);border-radius:12px}
+.d-card{position:relative;background:var(--color-d-surface);border:1px solid var(--color-d-border);border-radius:12px;box-shadow:0 1px 2px rgba(4,33,82,.05)}
 .d-card-hl::after{content:none}
 .d-card-int{transition:border-color .15s,background .15s}
 .d-card-int:hover{border-color:var(--color-d-border-strong);background:var(--color-d-surface-2)}
 .d-card-dashed{background:var(--color-d-surface);border:1px dashed var(--color-d-border-strong);border-radius:12px}
 
 /* Icon tile */
-.d-ic{display:grid;place-items:center;border-radius:8px;background:rgba(170,190,245,.1);color:#AABEF5}
-.d-ic-green{background:rgba(52,211,153,.12);color:#34d399}
-.d-ic-amber{background:rgba(251,191,36,.12);color:#fbbf24}
-.d-ic-purple{background:rgba(192,132,252,.12);color:#c084fc}
+.d-ic{display:grid;place-items:center;border-radius:8px;background:#eaf0fd;color:var(--color-d-accent)}
+.d-ic-green{background:#e4f5ee;color:var(--color-d-green)}
+.d-ic-amber{background:#fdf1e0;color:var(--color-d-amber)}
+.d-ic-purple{background:#f2eafe;color:var(--color-d-purple)}
 .d-ic-muted{background:var(--color-d-surface-2);color:var(--color-d-muted)}
 
 /* Buttons (apply with className; !important to win over shadcn variants) */
-.d-btn-primary{background:#ededed!important;color:#0a0a0c!important;border:0!important;box-shadow:none!important;transition:background .15s}
-.d-btn-primary:hover{background:#ffffff!important}
-.d-btn-ghost{background:transparent!important;border:1px solid var(--color-d-border-strong)!important;color:var(--color-d-text-2)!important}
-.d-btn-ghost:hover{border-color:#45454f!important;color:var(--color-d-text)!important}
-.d-btn-green{background:#10b981!important;color:#04140d!important;border:0!important}
+.d-btn-primary{background:var(--color-d-accent)!important;color:#ffffff!important;border:0!important;box-shadow:none!important;transition:background .15s}
+.d-btn-primary:hover{background:var(--color-d-accent-2)!important}
+.d-btn-ghost{background:var(--color-d-surface)!important;border:1px solid var(--color-d-border)!important;color:var(--color-d-text-2)!important}
+.d-btn-ghost:hover{background:var(--color-d-surface-2)!important;border-color:var(--color-d-border-strong)!important;color:var(--color-d-text)!important}
+.d-btn-green{background:#0a7f5c!important;color:#ffffff!important;border:0!important}
 .d-btn-green:hover{filter:brightness(1.06)}
 
 /* Inputs */
@@ -346,41 +333,41 @@ html:has(.runner-black), body:has(.runner-black){ background:#000; }
 /* Status tags with glowing dot */
 .d-tag{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;padding:3px 10px 3px 8px;border-radius:999px;line-height:1.7;white-space:nowrap}
 .d-tag::before{content:"";width:6px;height:6px;border-radius:50%;flex:none}
-.d-tag-info{color:#c4d2fb;background:rgba(170,190,245,.1);border:1px solid rgba(170,190,245,.28)} .d-tag-info::before{background:#AABEF5}
-.d-tag-warn{color:#fcd34d;background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.28)} .d-tag-warn::before{background:#fbbf24}
-.d-tag-good{color:#6ee7b7;background:rgba(52,211,153,.12);border:1px solid rgba(52,211,153,.28)} .d-tag-good::before{background:#34d399}
+.d-tag-info{color:var(--color-d-accent);background:#eaf0fd;border:1px solid #c9d9fa} .d-tag-info::before{background:var(--color-d-accent)}
+.d-tag-warn{color:var(--color-d-amber);background:#fdf1e0;border:1px solid #f2d9b4} .d-tag-warn::before{background:#d9891a}
+.d-tag-good{color:var(--color-d-green);background:#e4f5ee;border:1px solid #bfe6d7} .d-tag-good::before{background:var(--color-d-green)}
 .d-tag-muted{color:var(--color-d-muted);background:var(--color-d-surface-2);border:1px solid var(--color-d-border)} .d-tag-muted::before{background:var(--color-d-dim)}
-.d-tag-purple{color:#e2c5fd;background:rgba(192,132,252,.12);border:1px solid rgba(192,132,252,.28)} .d-tag-purple::before{background:#c084fc}
+.d-tag-purple{color:var(--color-d-purple);background:#f2eafe;border:1px solid #ddc9fb} .d-tag-purple::before{background:var(--color-d-purple)}
 
 /* Delta chips */
 .d-chip{display:inline-flex;align-items:center;gap:3px;font-size:11.5px;font-weight:600;padding:3px 8px;border-radius:999px}
-.d-chip-up{color:#34d399;background:rgba(52,211,153,.12)}
-.d-chip-down{color:#f87171;background:rgba(248,113,113,.12)}
+.d-chip-up{color:var(--color-d-green);background:#e4f5ee}
+.d-chip-down{color:var(--color-d-red);background:#fdeaea}
 .d-chip-flat{color:var(--color-d-dim);background:var(--color-d-surface-2)}
 
 /* Links */
-.d-link{color:#AABEF5;transition:color .15s}
-.d-link:hover{color:#c7d4fb}
+.d-link{color:var(--color-d-accent);transition:color .15s}
+.d-link:hover{color:var(--color-d-accent-2)}
 
 /* Tiny pill (spec chips on cards) */
 .d-pill{display:inline-flex;align-items:center;font-size:11px;padding:2px 8px;border-radius:6px;background:var(--color-d-surface-2);color:var(--color-d-text-2);border:1px solid var(--color-d-border)}
 
 /* Data tables */
 .d-table{width:100%;border-collapse:collapse}
-.d-table thead th{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--color-d-dim);text-align:left;font-weight:600;padding:11px 18px;background:var(--color-d-surface-2);border-bottom:1px solid rgba(255,255,255,.05)}
+.d-table thead th{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--color-d-dim);text-align:left;font-weight:600;padding:11px 18px;background:var(--color-d-surface-2);border-bottom:1px solid var(--color-d-border)}
 .d-table thead th.r{text-align:right}
-.d-table tbody td{padding:13px 18px;font-size:13.5px;border-bottom:1px solid rgba(255,255,255,.05);vertical-align:middle}
+.d-table tbody td{padding:13px 18px;font-size:13.5px;border-bottom:1px solid var(--color-d-border);vertical-align:middle}
 .d-table tbody td.r{text-align:right}
 .d-table tbody tr:last-child td{border-bottom:none}
 .d-table tbody tr{transition:background .12s}
-.d-table tbody tr:hover{background:rgba(170,190,245,.035)}
+.d-table tbody tr:hover{background:#f8faff}
 
 /* Sidebar */
-.d-side{position:relative;width:232px;flex-shrink:0;min-height:100vh;display:flex;flex-direction:column;background:var(--color-d-bg);border-right:1px solid var(--color-d-border);transition:width .2s ease}
+.d-side{position:relative;width:232px;flex-shrink:0;min-height:100vh;display:flex;flex-direction:column;background:var(--color-d-surface);border-right:1px solid var(--color-d-border);transition:width .2s ease}
 /* Clickable right-edge handle — toggles collapse. Desktop only. */
 .d-side-edge{display:none;position:absolute;top:0;right:-4px;width:9px;height:100%;z-index:20;padding:0;border:0;background:transparent;cursor:pointer}
 .d-side-edge::after{content:"";position:absolute;top:0;right:4px;width:2px;height:100%;background:transparent;transition:background .15s}
-.d-side-edge:hover::after,.d-side-edge:focus-visible::after{background:rgba(255,255,255,.12)}
+.d-side-edge:hover::after,.d-side-edge:focus-visible::after{background:rgba(4,33,82,.14)}
 @media (min-width:768px){ .d-side-edge{display:block} }
 /* Collapsed icon-rail — desktop only; the mobile drawer always renders full. */
 @media (min-width:768px){
@@ -396,15 +383,16 @@ html:has(.runner-black), body:has(.runner-black){ background:#000; }
 .d-navitem svg{opacity:.9;transition:color .15s,opacity .15s}
 .d-navitem:hover{background:var(--color-d-surface-2);color:var(--color-d-text)}
 .d-navitem:hover svg{opacity:1}
-.d-navitem.active{background:rgba(170,190,245,.1);color:#cdd9fb}
-.d-navitem.active svg{color:#AABEF5;opacity:1}
+.d-navitem.active{background:#eaf0fd;color:var(--color-d-accent)}
+.d-navitem.active svg{color:var(--color-d-accent);opacity:1}
 /* Inset accent bar — anchored to the row's own left edge so it never clips or
    detaches if the nav container padding changes. */
-.d-navitem.active::before{content:"";position:absolute;left:0;top:50%;transform:translateY(-50%);width:3px;height:20px;border-radius:0 3px 3px 0;background:#AABEF5}
+.d-navitem.active::before{content:"";position:absolute;left:0;top:50%;transform:translateY(-50%);width:3px;height:20px;border-radius:0 3px 3px 0;background:var(--color-d-accent)}
 .d-cap{font-size:11px;font-weight:600;letter-spacing:.08em;color:var(--color-d-dim);text-transform:uppercase}
 
 /* Avatar gradients */
 .d-av{display:grid;place-items:center;font-weight:700;color:#0b0f17}
+.d-av-1,.d-av-2,.d-av-3,.d-av-5{color:#ffffff}
 .d-av-1{background:linear-gradient(150deg,#AABEF5,#6B83BA)}
 .d-av-2{background:linear-gradient(150deg,#7dd3fc,#3b82f6)}
 .d-av-3{background:linear-gradient(150deg,#6ee7b7,#10b981)}
@@ -416,8 +404,8 @@ html:has(.runner-black), body:has(.runner-black){ background:#000; }
 .d-bar{height:6px;border-radius:999px;background:var(--color-d-surface-2);overflow:hidden}
 .d-bar>i{display:block;height:100%;border-radius:999px;background:var(--color-d-accent);transition:width .4s cubic-bezier(.4,0,.2,1),background .3s}
 /* Usage severity — driven by a `warn`/`danger` modifier on .d-bar */
-.d-bar.warn>i{background:#fbbf24}
-.d-bar.danger>i{background:#f87171}
+.d-bar.warn>i{background:#d9891a}
+.d-bar.danger>i{background:var(--color-d-red)}
 
 /* ── "Analizando" magic: skeleton shimmer, indeterminate bar, aurora glow and a
    staged pipeline. Used by the dealer Analizar workbench while an analysis streams. ── */
@@ -436,19 +424,19 @@ html:has(.runner-black), body:has(.runner-black){ background:#000; }
 @keyframes d-aurora{0%,100%{transform:translate3d(-8%,0,0)}50%{transform:translate3d(8%,0,0)}}
 .d-analyzing{position:relative;isolation:isolate}
 .d-analyzing::before{content:"";position:absolute;inset:-1px;z-index:-1;pointer-events:none;
-  background:radial-gradient(55% 130% at 18% 0%,rgba(170,190,245,.11),transparent 72%),
-             radial-gradient(45% 120% at 85% 100%,rgba(138,164,240,.08),transparent 70%);
+  background:radial-gradient(55% 130% at 18% 0%,rgba(43,91,215,.09),transparent 72%),
+             radial-gradient(45% 120% at 85% 100%,rgba(124,58,237,.06),transparent 70%);
   animation:d-aurora 4.5s ease-in-out infinite}
 
 /* Pipeline stage node: pending → active (pulsing accent ring) → done. */
-@keyframes d-stage-pulse{0%,100%{box-shadow:0 0 0 0 rgba(170,190,245,.45)}50%{box-shadow:0 0 0 5px rgba(170,190,245,0)}}
+@keyframes d-stage-pulse{0%,100%{box-shadow:0 0 0 0 rgba(43,91,215,.35)}50%{box-shadow:0 0 0 5px rgba(43,91,215,0)}}
 .d-stage{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:500;color:var(--color-d-dim);transition:color .3s;flex:0 0 auto;white-space:nowrap}
 .d-stage-ic{display:grid;place-items:center;width:22px;height:22px;border-radius:999px;flex:0 0 auto;
   background:var(--color-d-surface-2);color:var(--color-d-dim);border:1px solid var(--color-d-border);transition:background .3s,color .3s,border-color .3s}
 .d-stage.is-active{color:var(--color-d-text)}
-.d-stage.is-active .d-stage-ic{background:rgba(170,190,245,.14);color:var(--color-d-accent);border-color:transparent;animation:d-stage-pulse 1.6s ease-in-out infinite}
+.d-stage.is-active .d-stage-ic{background:#eaf0fd;color:var(--color-d-accent);border-color:transparent;animation:d-stage-pulse 1.6s ease-in-out infinite}
 .d-stage.is-done{color:var(--color-d-text-2)}
-.d-stage.is-done .d-stage-ic{background:rgba(52,211,153,.15);color:var(--color-d-green);border-color:transparent}
+.d-stage.is-done .d-stage-ic{background:#e4f5ee;color:var(--color-d-green);border-color:transparent}
 /* Connector line between stage nodes */
 .d-stage-line{flex:1;height:1px;background:var(--color-d-border);margin:0 2px;transition:background .3s;min-width:8px}
 .d-stage-line.is-done{background:color-mix(in srgb,var(--color-d-green) 55%,transparent)}

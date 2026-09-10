@@ -14,7 +14,10 @@ export type DealerEventType =
   | 'presupuesto_visto'    // client opened the public /pr link (first time)
   | 'presupuesto_aceptado' // client self-accepted the quote from the public /pr link
   | 'analisis_completado'  // car analysis finished
-  | 'interes_confirmado';  // advisor: client saw their result and asked us to search
+  | 'interes_confirmado'    // advisor: client saw their result and asked us to search
+  | 'servicio_encargado'    // trámites: gestor (576 + IVTM) o ingeniero (ficha reducida) encargado
+  | 'servicio_pagado'       // trámites: pago confirmado por Stripe, el encargo entra en cola
+  | 'servicio_completado';  // trámites: el gestor o el ingeniero lo ha entregado
 
 export interface DealerEventPayload {
   client_name?: string | null;

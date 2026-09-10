@@ -57,7 +57,11 @@ function DealerShell({ children }: { children: React.ReactNode }) {
             <span className="underline underline-offset-2">Ver planes →</span>
           </Link>
         )}
-        <div className="px-4 sm:px-6 md:px-10 pt-16 md:pt-8 pb-8 w-full mx-auto max-w-7xl">
+        {/* Sin tope de ancho y con menos margen lateral: en un portatil de 14"
+            cada pixel cuenta, y las tablas de la consola son lo primero que
+            sufre un padding generoso. Las pantallas con texto largo ponen su
+            propio freno de lectura, no lo pone el armazon. */}
+        <div className="px-4 sm:px-5 md:px-6 pt-16 md:pt-8 pb-8 w-full">
           {children}
         </div>
       </main>

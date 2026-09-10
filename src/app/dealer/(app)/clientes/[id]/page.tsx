@@ -13,7 +13,7 @@ import {
   CheckCircle2, Truck, ShoppingBag, XCircle, Clipboard,
   Sparkles, AlertTriangle, Check, X, MapPin, Download,
   RefreshCw, MoreHorizontal, ClipboardCheck, Trash2, Clock, Eye, EyeOff,
-  Camera, Receipt,
+  Camera, Receipt, Stamp,
 } from 'lucide-react';
 import Link from 'next/link';
 import { buildAnalysisView, type AnalysisView } from '@/lib/analysis-view';
@@ -21,6 +21,7 @@ import { DealerAnalysisPeek } from '@/components/dealer/DealerAnalysisReport';
 import { PhotoStrip } from '@/components/dealer/PhotoLightbox';
 import { AnalyzingCard } from '@/components/dealer/AnalyzeStages';
 import BuscarSearch from '@/components/dealer/operation/BuscarSearch';
+import TramitesPanel, { type ServiceOrderLite } from '@/components/dealer/operation/TramitesPanel';
 import { consumeAnalyzeStream } from '@/lib/analyze-stream';
 import { buildInitialPresupuestoData, renderPresupuestoHtml, type PresupuestoData as PresupuestoContent } from '@/lib/presupuesto-template';
 import { STAGES, PHASES, stageDef, phaseOf } from '@/lib/dealer/pipeline';
@@ -278,77 +279,6 @@ function Stat({ label, value, amber }: { label: string; value: string; amber?: b
     steps collapse to a one-line receipt but reopen fully interactive (accordion,
     not wizard — analyses arriving while you compare is normal business). The
     current step is always open and shows its POSTURE: whose move it is. */
-function StepSection({
-  id, index, title, icon: Icon, state, posture, days, summary, open, onToggle, children,
-}: {
-  id?: string;
-  index: number;
-  title: string;
-  icon: React.ComponentType<{ className?: string }>;
-  state: 'done' | 'current' | 'upcoming';
-  posture?: { kind: 'turno' | 'esperando'; label: string; days?: number | null } | null;
-  days?: number | null;
-  summary?: string;
-  open?: boolean;
-  onToggle?: () => void;
-  children?: ReactNode;
-}) {
-  if (state === 'upcoming') {
-    return (
-      <div id={id} className="flex items-center gap-3 py-2.5 border-t border-d-border opacity-45">
-        <span className="w-7 h-7 grid place-items-center shrink-0"><Icon className="w-3.5 h-3.5 text-d-dim" /></span>
-        <span className="text-[13px] text-d-dim">{index}. {title}</span>
-      </div>
-    );
-  }
-  if (state === 'done') {
-    return (
-      <div id={id} className="border-t border-d-border first:border-t-0">
-        <button onClick={onToggle} className="w-full flex items-center gap-3 py-3 text-left hover:bg-d-surface-2/40 transition-colors">
-          <span className="w-7 h-7 rounded-full grid place-items-center shrink-0 bg-d-green/10 text-d-green">
-            <Check className="w-4 h-4" />
-          </span>
-          <span className="text-[13px] font-semibold text-d-text-2 shrink-0">{index}. {title}</span>
-          {summary && <span className="text-[13px] text-d-dim truncate min-w-0">{summary}</span>}
-          <ChevronDown className={`w-3.5 h-3.5 text-d-dim shrink-0 ml-auto transition-transform ${open ? 'rotate-180' : ''}`} />
-        </button>
-        {open && children && <div className="pb-5">{children}</div>}
-      </div>
-    );
-  }
-  return (
-    <div id={id} className="border-t border-d-border first:border-t-0 py-4">
-      <div className="flex items-start gap-3 pb-3">
-        <span className="w-8 h-8 rounded-lg grid place-items-center shrink-0 bg-d-accent/15 text-d-accent">
-          <Icon className="w-4 h-4" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[17px] font-semibold text-d-text leading-tight">{index}. {title}</span>
-            {days != null && days >= 1 && <span className="text-d-dim text-[11px] d-num">· {days} día{days === 1 ? '' : 's'}</span>}
-          </div>
-          {/* Posture: amber = your move (with the imperative), dim clock =
-              waiting on the world (with who + how long). */}
-          {posture && (posture.kind === 'turno' ? (
-            <p className="text-[13px] mt-1 flex items-center gap-1.5 flex-wrap">
-              <span className="w-1.5 h-1.5 rounded-full bg-d-amber shrink-0" />
-              <span className="text-d-amber font-medium">Tu turno</span>
-              <span className="text-d-muted">— {posture.label}</span>
-            </p>
-          ) : (
-            <p className="text-[13px] mt-1 flex items-center gap-1.5 flex-wrap text-d-dim">
-              <Clock className="w-3.5 h-3.5 shrink-0" /> {posture.label}
-              {posture.days != null && posture.days >= 1 && <span className="d-num">· hace {posture.days} día{posture.days === 1 ? '' : 's'}</span>}
-            </p>
-          ))}
-        </div>
-      </div>
-      <div>{children}</div>
-    </div>
-  );
-}
-
-
 type CaseData = { client: ClientData; leads: LeadData[]; presupuestos: PresupuestoData[] };
 
 export default function ClientDetailPage() {
@@ -380,9 +310,14 @@ export default function ClientDetailPage() {
   const [comparison, setComparison] = useState<any>(null);
   const [expandedLeads, setExpandedLeads] = useState<Set<string>>(new Set());
   // Reopened (non-current) steps of the accordion — the current step is always open.
-  const [openSteps, setOpenSteps] = useState<Set<string>>(new Set());
+  // Paso abierto en el espacio de trabajo. null = el que toca segun la etapa;
+  // en cuanto el dealer toca una pestaña manda su eleccion.
+  const [activeStep, setActiveStep] = useState<string | null>(null);
+  // Pestañas ya abiertas. Se quedan montadas (ocultas con `hidden`) para que
+  // volver a una sea instantaneo: la busqueda de motorizaciones y los anuncios
+  // de mobile.de que ya cargaron no se vuelven a pedir.
+  const [visitedSteps, setVisitedSteps] = useState<Set<string>>(new Set());
   // Steps the dealer folded by hand that would otherwise be open by default.
-  const [closedSteps, setClosedSteps] = useState<Set<string>>(new Set());
   const analyzingRef = useRef(false);
   const analyzingRef2 = useRef<HTMLDivElement | null>(null);
 
@@ -533,6 +468,11 @@ export default function ClientDetailPage() {
     else if (client.stage === 'propuesta' && presupuestos.some(p => p.status === 'enviado')) updateStage('acuerdo');
     else if (client.stage === 'acuerdo' && client.agreed_price != null) updateStage('runner');
   }, [loading, client, presupuestos]);
+
+  // Los encargos de trámites los carga TramitesPanel (una sola llamada); se
+  // suben aquí para que el paso sepa si está hecho o si quedó un pago a medias.
+  const [serviceOrders, setServiceOrders] = useState<ServiceOrderLite[]>([]);
+  const onServiceOrders = useCallback((o: ServiceOrderLite[]) => setServiceOrders(o), []);
 
   const [menuOpen, setMenuOpen] = useState(false);
   const undoPhase = () => {
@@ -1057,9 +997,9 @@ export default function ClientDetailPage() {
       await consumeAnalyzeStream(res, { onProgress: m => setAnalyzeProgress(m) });
       const fresh = await fetchData();
       advanceTo('busqueda'); // first candidate analyzed = sourcing is underway
-      // Stage moved, but the dealer is still in "analizar" — keep the step open
-      // so they can paste the next link (today's car, tomorrow's car).
-      setOpenSteps(prev => new Set(prev).add('analizar'));
+      // La etapa avanza, pero el dealer sigue en "analizar": la pestaña se
+      // queda ahi para pegar el siguiente enlace (el coche de hoy, el de manana).
+      setActiveStep('analizar');
       // 202 in-progress dedupe (or a dropped stream) can leave the lead pending
       // even though the analysis finishes server-side — poll it home.
       if ((fresh?.leads || []).some(leadIsPending)) startPolling();
@@ -1098,7 +1038,7 @@ export default function ClientDetailPage() {
         setBatchUrls('');
         await fetchData(); // show the queued leads immediately
         advanceTo('busqueda');
-        setOpenSteps(prev => new Set(prev).add('analizar'));
+        setActiveStep('analizar');
         startPolling();    // then poll until every lead links (or 4 min pass)
         notify(`${data.queued} de ${data.total} análisis en cola — irán apareciendo en «Coches analizados».`);
       } else {
@@ -1149,23 +1089,11 @@ export default function ClientDetailPage() {
     if (next.has(leadId)) next.delete(leadId); else next.add(leadId);
     return next;
   });
-  const toggleStep = (key: string, openNow: boolean) => {
-    setOpenSteps(prev => {
-      const next = new Set(prev);
-      if (openNow) next.delete(key); else next.add(key);
-      return next;
-    });
-    setClosedSteps(prev => {
-      const next = new Set(prev);
-      if (openNow) next.add(key); else next.delete(key);
-      return next;
-    });
-  };
   // "Point, don't describe": empty states open another step and scroll to it
   // instead of telling the dealer to go find it.
   const openStep = (key: string) => {
-    setOpenSteps(prev => new Set(prev).add(key));
-    setTimeout(() => document.getElementById(`step-${key}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
+    setActiveStep(key);
+    setTimeout(() => document.getElementById('workspace')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
   };
 
   const shortlistedCount = leads.filter(l => l.is_shortlisted).length;
@@ -1176,7 +1104,7 @@ export default function ClientDetailPage() {
   const handleSearchAnalyzed = async () => {
     const fresh = await fetchData();
     advanceTo('busqueda'); // first candidate analyzed = sourcing is underway
-    setOpenSteps(prev => new Set(prev).add('analizar')); // keep searching/analyzing
+    setActiveStep('analizar'); // seguir buscando y analizando
     if ((fresh?.leads || []).some(leadIsPending)) startPolling();
   };
 
@@ -1730,12 +1658,14 @@ export default function ClientDetailPage() {
       // per requested model) + the paste box. Reopening this step IS "analizar
       // más coches" — there is no separate fold anymore.
       case 'analizar': {
-        const searchAvailable = ['solicitud', 'busqueda', 'seleccion'].includes(client.stage);
+        // El buscador ya NO se esconde al pasar de etapa. Un coche puede caerse
+        // en el runner y hay que volver a buscar el mismo dia; esconderlo
+        // obligaba a abrir otra operacion.
         return (
           <div className="space-y-4">
             {requestBlock}
             {searchLinks()}
-            {searchAvailable && (
+            {(
               <BuscarSearch
                 vehicles={reqVehicles
                   .filter(v => v.make && v.model)
@@ -2009,6 +1939,21 @@ export default function ClientDetailPage() {
             </button>
           </div>
         );
+      case 'tramites':
+        return (
+          <TramitesPanel
+            requestId={client.id}
+            token={session?.access_token}
+            runnerReport={client.runner_report}
+            onOrders={onServiceOrders}
+            prefill={{
+              iedmtInputs: chosenView?.iedmt?.inputs ?? null,
+              co2: chosenView?.ficha?.emisiones_co2 ?? null,
+              año: chosenView?.ficha?.año ?? null,
+              carTitle,
+            }}
+          />
+        );
       case 'entrega': {
         const apLocal = actualPurchase ? Number(actualPurchase) : 0;
         const expTotalLocal = expenses.reduce((s, e) => s + (Number(e.amount) || 0), 0);
@@ -2115,6 +2060,8 @@ export default function ClientDetailPage() {
   const anyAccepted = !!client && (client.agreed_price != null || presupuestos.some(p => p.status === 'aceptado'));
   const fichaShared = !!(runnerLink || client?.runner_packet?.token);
   const comprado = !!client?.transit_progress?.comprado;
+  const pagoPendiente = serviceOrders.some(o => o.status === 'pendiente_pago');
+  const tramitesListos = serviceOrders.filter(o => o.status === 'completado').length;
 
   type Posture = { kind: 'turno' | 'esperando'; label: string; sinceIso?: string | null } | null;
   interface StepModel {
@@ -2178,6 +2125,26 @@ export default function ClientDetailPage() {
       sinceIso: client.runner_packet?.created_at ?? null,
     },
     {
+      key: 'tramites', title: 'Impuestos y ficha reducida', icon: Stamp,
+      // Nunca bloquea: los trámites son opcionales, así que el paso se da por
+      // hecho en cuanto el coche está comprado. Solo vuelve a abrirse si quedó
+      // un checkout a medias — ahí sí hay algo que el dealer tiene que cerrar.
+      done: comprado && !pagoPendiente,
+      summary: serviceOrders.length
+        ? `${tramitesListos} de ${serviceOrders.length} listos`
+        : comprado ? 'Sin encargar' : '',
+      posture: pagoPendiente
+        ? { kind: 'turno' as const, label: 'termina el pago del trámite que dejaste a medias' }
+        : serviceOrders.length
+          ? { kind: 'esperando' as const, label: 'Nuestro gestor e ingeniero están con ello — te avisamos al terminar' }
+          // Con informe del runner y sin comprar todavia, lo que toca es la
+          // ficha: se tramita con el coche aun en Alemania y llega antes.
+          : client.runner_report && !comprado
+            ? { kind: 'turno' as const, label: 'ya puedes encargar la ficha reducida — el ingeniero trabaja con las fotos del runner' }
+            : { kind: 'turno' as const, label: 'encarga los impuestos (576 e IVTM) y la ficha reducida, o sigue sin ellos' },
+      sinceIso: client.transit_progress?.comprado ?? null,
+    },
+    {
       key: 'entrega', title: 'Tránsito y entrega', icon: ShoppingBag,
       done: client.stage === 'entregado',
       summary: client.stage === 'entregado' ? 'Entregado' : comprado ? 'En camino a España' : '',
@@ -2192,8 +2159,7 @@ export default function ClientDetailPage() {
   // `busqueda` is choosing territory (cap 1), and `seleccion` (= finalist
   // starred) is presupuesto territory (cap 2). «Deshacer» regresses the stage
   // below these caps (buscar.back = 'busqueda' → reopens elegir).
-  const stageStepIdx: Record<string, number> = { solicitud: 0, busqueda: 1, seleccion: 2, propuesta: 2, acuerdo: 2, runner: 3, transito: 4, entregado: 4 };
-  const sourcingStage = !!client && ['solicitud', 'busqueda', 'seleccion'].includes(client.stage);
+  const stageStepIdx: Record<string, number> = { solicitud: 0, busqueda: 1, seleccion: 2, propuesta: 2, acuerdo: 2, runner: 3, transito: 5, tramites: 5, entregado: 5 };
   const artifactIdx = steps.findIndex(s => !s.done);
   const currentStepIdx = !client || isLost
     ? -1
@@ -2201,8 +2167,23 @@ export default function ClientDetailPage() {
       ? steps.length - 1
       : Math.min(artifactIdx === -1 ? steps.length - 1 : artifactIdx, stageStepIdx[client.stage] ?? 0);
 
+  // Pestaña abierta: la que eligio el dealer o, si no ha elegido, la que toca.
+  const stepKey = (activeStep && steps.some(s => s.key === activeStep))
+    ? activeStep
+    : steps[Math.max(currentStepIdx, 0)]?.key ?? 'analizar';
+  const activeStepDef = steps.find(s => s.key === stepKey) ?? null;
+
+  // Registro de pestañas abiertas alguna vez en esta visita. Sin esto, cambiar
+  // de pestaña desmontaba el panel y al volver se repetian las llamadas lentas
+  // (motorizaciones por IA, anuncios de mobile.de).
+  useEffect(() => {
+    setVisitedSteps(prev => (prev.has(stepKey) ? prev : new Set(prev).add(stepKey)));
+  }, [stepKey]);
+
+  // La ficha SI mantiene tope de ancho: aqui hay parrafos (veredicto del
+  // analisis, fallos del motor, comparativa IA) y una linea de 1600px no se lee.
   return (
-    <div className="space-y-4 max-w-7xl mx-auto pb-10">
+    <div className="space-y-4 max-w-[1400px] pb-10">
       <Link href="/dealer/operaciones" className="inline-flex items-center gap-2 text-d-muted hover:text-d-text text-sm transition-colors">
         <ArrowLeft className="w-4 h-4" /> Operaciones
       </Link>
@@ -2217,7 +2198,10 @@ export default function ClientDetailPage() {
               not from here; the ⋯ menu holds the rare escape hatches. */}
           <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-              <div className="min-w-0 order-1 md:flex-1">
+              {/* min-w-[240px]: con `min-w-0` + `flex-1` el titulo podia
+                  encogerse hasta un ancho de una palabra y el nombre salia
+                  apilado en vertical. Ahora la fila rompe antes que el titulo. */}
+              <div className="order-1 md:flex-1 min-w-[240px]">
                 <h1 className="text-[22px] font-bold text-d-text tracking-tight leading-tight">
                   {client.client_name}
                   {carTitle && <span className="text-d-dim font-semibold"> · {carTitle}</span>}
@@ -2330,48 +2314,70 @@ export default function ClientDetailPage() {
             <div className="rounded-xl border border-d-accent/25 bg-d-accent/5 px-4 py-3 flex items-start gap-3">
               <Sparkles className="w-4 h-4 text-d-accent shrink-0 mt-0.5" />
               <p className="text-d-text-2 text-[13px] leading-relaxed flex-1">
-                Así funciona una operación: <span className="text-d-text">avanza paso a paso según trabajas</span>. <span className="text-d-text">El paso abierto es siempre el que toca</span> — con «Tu turno» o «Esperando a…» debajo del título — y los pasos hechos se pliegan arriba; tócalos para reabrirlos.
+Así funciona una operación: <span className="text-d-text">cada paso es una pestaña</span> y se abre sola la que toca, con «Tu turno» o «Esperando a…» debajo. <span className="text-d-text">Todas siguen disponibles</span>: la búsqueda por motorización no se cierra porque el trato avance.
               </p>
               <button onClick={dismissIntro} aria-label="Entendido" className="text-d-dim hover:text-d-text p-1 -m-1 shrink-0"><X className="w-4 h-4" /></button>
             </div>
           )}
 
-          {/* The operación as a step accordion: done steps collapse to one-line
-              receipts (reopenable, fully interactive), the current step is open
-              showing its posture, upcoming steps are ghosts. For a lost deal
-              nothing is current — steps keep their done receipts. */}
-          <div className="min-w-0">
-            {steps.map((s, i) => {
-              const state: 'done' | 'current' | 'upcoming' =
-                i === currentStepIdx ? 'current' : (s.done || (currentStepIdx !== -1 && i < currentStepIdx)) ? 'done' : 'upcoming';
-              // Sourcing never really "finishes": good German ads show up day
-              // after day, so «Buscar y analizar» stays open (and reopens on
-              // tomorrow's visit) until a presupuesto is on the table. One
-              // analysis used to fold it and drop the dealer into «Elegir
-              // finalista» with no visible way back to searching.
-              const open = state === 'current'
-                || (s.key === 'analizar' && sourcingStage && !closedSteps.has(s.key))
-                || (state === 'done' && openSteps.has(s.key));
-              return (
-                <StepSection
-                  key={s.key}
-                  id={`step-${s.key}`}
-                  index={i + 1}
-                  title={s.title}
-                  icon={s.icon}
-                  state={state}
-                  posture={state === 'current' && !delivered && s.posture
-                    ? { kind: s.posture.kind, label: s.posture.label, days: s.posture.sinceIso ? daysSince(s.posture.sinceIso) : null }
-                    : null}
-                  days={state === 'current' && !delivered && s.sinceIso ? daysSince(s.sinceIso) : null}
-                  summary={s.summary}
-                  open={open}
-                  onToggle={() => toggleStep(s.key, open)}
-                >
-                  {open ? renderStep(s.key) : null}
-                </StepSection>
-              );
-            })}
+          {/* El espacio de trabajo: un paso por pestaña. Se abre por defecto el
+              que toca segun la etapa, pero TODOS son accesibles siempre — la
+              busqueda de motorizaciones no desaparece porque el trato avance. */}
+          <div className="min-w-0" id="workspace">
+            <div className="flex items-center gap-1 overflow-x-auto border-b border-d-border">
+              {steps.map((s, i) => {
+                const done = s.done || (currentStepIdx !== -1 && i < currentStepIdx);
+                const on = s.key === stepKey;
+                const Icon = s.icon;
+                return (
+                  <button
+                    key={s.key}
+                    onClick={() => setActiveStep(s.key)}
+                    className={`inline-flex items-center gap-2 px-3 py-2.5 text-[13px] whitespace-nowrap border-b-2 transition-colors ${
+                      on
+                        ? 'border-d-accent text-d-text font-semibold'
+                        : 'border-transparent text-d-muted hover:text-d-text'
+                    }`}
+                  >
+                    <span
+                      className={`w-5 h-5 rounded-full grid place-items-center shrink-0 ${
+                        done ? 'bg-d-green/12 text-d-green' : on ? 'bg-d-accent/12 text-d-accent' : 'bg-d-surface-2 text-d-dim'
+                      }`}
+                    >
+                      {done ? <Check className="w-3 h-3" /> : <Icon className="w-3 h-3" />}
+                    </span>
+                    {s.title}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Postura del paso abierto: tu turno (ambar) o esperando a alguien. */}
+            {activeStepDef && !isLost && !delivered && activeStepDef.posture && (
+              <div className="pt-3">
+                {activeStepDef.posture.kind === 'turno' ? (
+                  <p className="text-[13px] flex items-center gap-1.5 flex-wrap">
+                    <span className="w-1.5 h-1.5 rounded-full bg-d-amber shrink-0" />
+                    <span className="text-d-amber font-medium">Tu turno</span>
+                    <span className="text-d-muted">— {activeStepDef.posture.label}</span>
+                  </p>
+                ) : (
+                  <p className="text-[13px] flex items-center gap-1.5 flex-wrap text-d-dim">
+                    <Clock className="w-3.5 h-3.5 shrink-0" /> {activeStepDef.posture.label}
+                    {activeStepDef.posture.sinceIso && (
+                      <span className="d-num">· hace {daysSince(activeStepDef.posture.sinceIso)} dias</span>
+                    )}
+                  </p>
+                )}
+              </div>
+            )}
+            {activeStepDef?.summary && (
+              <p className="text-d-dim text-[12.5px] pt-1.5">{activeStepDef.summary}</p>
+            )}
+
+            {[...visitedSteps].map(k => (
+              <div key={k} hidden={k !== stepKey} className="pt-4">{renderStep(k)}</div>
+            ))}
           </div>
         </>
       )}

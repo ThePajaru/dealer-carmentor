@@ -12,6 +12,8 @@ import {
   LayoutList,
   Camera,
   Check,
+  Stamp,
+  FileSignature,
 } from 'lucide-react';
 import ScrollReveal from '@/components/motion/ScrollReveal';
 import StaggerChildren, { StaggerItem } from '@/components/motion/StaggerChildren';
@@ -25,6 +27,7 @@ const STAGES = [
   { label: 'Acuerdo', sub: 'precio + ETA', money: false },
   { label: 'Runner', sub: 'inspección + fotos', money: false },
   { label: 'Tránsito', sub: 'seguimiento', money: false },
+  { label: 'Trámites', sub: '576 · IVTM · ficha', money: true },
   { label: 'Entrega', sub: 'margen real', money: true },
 ];
 
@@ -70,6 +73,18 @@ const FEATURES = [
     tag: 'diferencial',
     title: 'La revisión del runner',
     desc: 'Checklist IA por fases en el móvil, fotos de prueba, km reales, precio negociado y veredicto comprar / no comprar.',
+  },
+  {
+    icon: Stamp,
+    hi: true,
+    tag: 'lo hacemos nosotros',
+    title: 'Impuestos pagados por nuestro gestor',
+    desc: 'Modelo 576 y IVTM presentados y pagados por nosotros, con el 576 estimado antes de encargarlo. Tú no pisas Hacienda ni el ayuntamiento.',
+  },
+  {
+    icon: FileSignature,
+    title: 'Ficha técnica reducida firmada',
+    desc: 'Nuestro ingeniero la firma con las fotos que tu runner ya sacó en la inspección. Sin COC, sin una segunda visita al coche.',
   },
   {
     icon: MapPin,
@@ -165,7 +180,8 @@ export default function DealerLandingPage() {
           <ScrollReveal delay={0.16}>
             <p className="mx-auto mt-6 max-w-[620px] text-[15px] leading-[1.65] text-ink sm:text-[18px]">
               De la solicitud del cliente a las llaves en tu campa: una sola herramienta, guiada por
-              IA, que conduce cada operación de Alemania a España de principio a fin.
+              IA, que conduce cada operación de Alemania a España de principio a fin — impuestos y
+              ficha técnica incluidos, que los hacemos nosotros.
             </p>
           </ScrollReveal>
           <ScrollReveal delay={0.24}>
@@ -512,6 +528,97 @@ export default function DealerLandingPage() {
                     </div>
                   </div>
                 </div>
+              </div>
+            </ScrollReveal>
+          </div>
+        </div>
+      </section>
+
+      {/* ---------- Después de la compra: gestor + ingeniero ---------- */}
+      <section className="bg-paper/75 px-4 py-14 sm:px-6 sm:py-20">
+        <div className="mx-auto max-w-[1100px]">
+          <ScrollReveal className="mb-9">
+            <Kicker>Y lo que viene después</Kicker>
+            <h2 className="[font-family:var(--font-display-alt)] max-w-[760px] text-[clamp(34px,8vw,58px)] leading-[0.95] tracking-[0.02em] text-navy">
+              EL COCHE YA ES TUYO. LOS PAPELES LOS HACEMOS NOSOTROS.
+            </h2>
+            <p className="mt-4 max-w-[600px] text-[15px] leading-[1.65] text-ink">
+              Cada operación queda guardada con su análisis, su presupuesto y la inspección del
+              runner. Desde ahí, con un clic, la pasas a nuestro gestor y a nuestro ingeniero. Se
+              pagan por operación: solo cuando los usas.
+            </p>
+          </ScrollReveal>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <ScrollReveal>
+              <div className="flex h-full flex-col rounded-[14px] border border-peri/40 bg-white p-5 sm:p-6">
+                <div className="flex items-center gap-2.5">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-navy text-peri">
+                    <Stamp size={19} />
+                  </span>
+                  <div>
+                    <div className="[font-family:var(--font-mono)] text-[9px] font-bold uppercase tracking-[0.12em] text-verdict-deep">
+                      Nuestro gestor
+                    </div>
+                    <h3 className="text-[17px] font-bold leading-tight text-navy">
+                      Impuestos de matriculación
+                    </h3>
+                  </div>
+                </div>
+                <p className="mt-3.5 text-[14px] leading-[1.6] text-ink">
+                  Presentamos y pagamos el <b className="text-navy">modelo 576</b> (impuesto de
+                  matriculación) y el <b className="text-navy">IVTM</b> del ayuntamiento donde se
+                  matricula el coche. Antes de encargarlo ves el 576 estimado con la valoración, el
+                  CO2 y tu comunidad.
+                </p>
+                <ul className="mt-4 space-y-1.5">
+                  {[
+                    'Modelo 576 presentado y pagado',
+                    'IVTM del municipio, con su ordenanza',
+                    'Justificantes de pago en la operación',
+                  ].map((t) => (
+                    <li key={t} className="flex items-start gap-2 text-[13.5px] text-ink">
+                      <Check size={15} className="mt-[3px] shrink-0 text-verdict" />
+                      {t}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </ScrollReveal>
+
+            <ScrollReveal delay={0.08}>
+              <div className="flex h-full flex-col rounded-[14px] border border-peri/40 bg-white p-5 sm:p-6">
+                <div className="flex items-center gap-2.5">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-navy text-peri">
+                    <FileSignature size={19} />
+                  </span>
+                  <div>
+                    <div className="[font-family:var(--font-mono)] text-[9px] font-bold uppercase tracking-[0.12em] text-verdict-deep">
+                      Nuestro ingeniero
+                    </div>
+                    <h3 className="text-[17px] font-bold leading-tight text-navy">
+                      Ficha técnica reducida
+                    </h3>
+                  </div>
+                </div>
+                <p className="mt-3.5 text-[14px] leading-[1.6] text-ink">
+                  Las fotos que la ficha necesita —{' '}
+                  <b className="text-navy">permiso, placa del fabricante, las cuatro vistas</b> — ya
+                  las saca tu runner dentro de su inspección normal. Nuestro ingeniero redacta y
+                  firma la ficha con ellas, sin volver a ver el coche.
+                </p>
+                <ul className="mt-4 space-y-1.5">
+                  {[
+                    'Sin COC: sale con las fotos de la inspección',
+                    'Se tramita con el coche todavía en Alemania',
+                    'Ficha firmada en PDF, en la propia operación',
+                  ].map((t) => (
+                    <li key={t} className="flex items-start gap-2 text-[13.5px] text-ink">
+                      <Check size={15} className="mt-[3px] shrink-0 text-verdict" />
+                      {t}
+                    </li>
+                  ))}
+                </ul>
               </div>
             </ScrollReveal>
           </div>

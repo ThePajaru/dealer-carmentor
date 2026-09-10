@@ -9,7 +9,7 @@
 // taxonomy and they drifted — see docs/DEALER_PIPELINE.md.)
 
 import {
-  Clock, Search, Star, FileText, CheckCircle2, Truck, Send, ShoppingBag,
+  Clock, Search, Star, FileText, CheckCircle2, Truck, Send, ShoppingBag, Stamp,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -20,7 +20,7 @@ export const DOT_MOVING = '#34d399';
 
 export type StageKey =
   | 'solicitud' | 'busqueda' | 'seleccion' | 'propuesta'
-  | 'acuerdo' | 'runner' | 'transito' | 'entregado' | 'perdido';
+  | 'acuerdo' | 'runner' | 'transito' | 'tramites' | 'entregado' | 'perdido';
 
 export interface StageDef {
   key: StageKey;
@@ -91,6 +91,16 @@ export const STAGES: StageDef[] = [
     howWeHelp: 'Mantenemos informado al cliente y cerramos tu margen real.',
     tip: 'Coche comprado y de camino a España. Seguimiento en vivo para el cliente.',
   },
+  // Servicios con persona detrás sobre una operación ya cerrada de compra: el
+  // gestor paga 576 + IVTM y el ingeniero firma la ficha técnica reducida con
+  // las fotos del runner. Se entra aquí al encargar el primer servicio.
+  {
+    key: 'tramites', label: 'Trámites', icon: Stamp, dot: DOT_ACTION,
+    next: 'Encargar impuestos y ficha',
+    nextAction: 'Encarga los impuestos (576 e IVTM) y la ficha técnica reducida.',
+    howWeHelp: 'Nuestro gestor paga los impuestos y nuestro ingeniero firma la ficha reducida.',
+    tip: 'Impuestos de matriculación y ficha técnica reducida, hechos por nosotros.',
+  },
   {
     key: 'entregado', label: 'Entregado', icon: ShoppingBag, dot: DOT_MOVING,
     next: '',
@@ -122,7 +132,8 @@ export interface PhaseDef {
 }
 
 // The 5 phases every surface renders. Each groups the granular stages into one
-// coherent unit of work.
+// coherent unit of work. (Trámites joined on 2026-09-09 with the gestor +
+// ingeniero services; the old Entrega phase kept only `entregado`.)
 export const PHASES: PhaseDef[] = [
   {
     key: 'buscar', label: 'Búsqueda y análisis', icon: Search,
@@ -148,18 +159,26 @@ export const PHASES: PhaseDef[] = [
     dot: DOT_ACTION, next: 'Pasar info al runner',
     tip: 'Tu chico sube a Alemania con el checklist de inspección y los dealbreakers.',
   },
+  // Tránsito y trámites van juntos a propósito: la ficha reducida se tramita con
+  // el coche todavía rodando, y los impuestos en cuanto llega. Una sola fase.
+  {
+    key: 'tramites', label: 'Trámites', icon: Stamp,
+    stages: ['transito', 'tramites'], back: 'transito',
+    dot: DOT_ACTION, next: 'Impuestos y ficha reducida',
+    tip: 'Coche de camino. Nuestro gestor paga el 576 y el IVTM; nuestro ingeniero firma la ficha reducida.',
+  },
   {
     key: 'entrega', label: 'Entrega', icon: ShoppingBag,
-    stages: ['transito', 'entregado'], back: 'transito',
+    stages: ['entregado'], back: 'tramites',
     dot: DOT_MOVING, next: 'Recepción y cierre',
-    tip: 'Coche comprado y de camino a España. Seguimiento en vivo y cierre del margen real.',
+    tip: 'Coche en España. Recepción, cierre del margen real y entrega al cliente.',
   },
 ];
 
 // Stages where the ball is in the dealer's court and money is on the table.
 // Kept atomic (not phase-level) so the action queue stays precise: a job in
 // `solicitud` is not "waiting on you" even though it shares the buscar phase.
-export const ACTION_STAGES = new Set<string>(['seleccion', 'propuesta', 'acuerdo', 'runner']);
+export const ACTION_STAGES = new Set<string>(['seleccion', 'propuesta', 'acuerdo', 'runner', 'tramites']);
 
 export const stageDef = (key: string): StageDef | undefined =>
   STAGES.find(s => s.key === key) ?? (key === 'perdido' ? PERDIDO : undefined);

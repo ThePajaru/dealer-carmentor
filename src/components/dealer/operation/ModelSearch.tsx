@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
   Gauge, Loader2, Search, SlidersHorizontal, CheckCircle2, AlertTriangle,
   Car, ExternalLink, RotateCcw, Plus, Ban, Sparkles,
@@ -82,9 +83,31 @@ export default function ModelSearch({
     : (vehicle.variant && looksLikeEngine(vehicle.variant) ? [vehicle.variant] : []);
   const reqKey = reqDesignations.join('|');
 
-  const [data, setData] = useState<Motorizations | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [failed, setFailed] = useState(false);
+  // La motorizacion la contesta un modelo de IA: tarda segundos y para un mismo
+  // modelo/anos/combustible la respuesta no cambia. Va por React Query con media
+  // hora de frescura, asi cambiar de pestaña o volver a la operacion es
+  // instantaneo en vez de repetir la llamada.
+  const { data: motor, isPending, isError } = useQuery({
+    queryKey: ['dealer', 'motorizations', make, model, minYear, maxYear ?? null, fuel, reqKey],
+    enabled: !!token,
+    staleTime: 30 * 60_000,
+    gcTime: 60 * 60_000,
+    retry: 0,
+    queryFn: async (): Promise<Motorizations> => {
+      const r = await fetch('/api/dealer/motorizations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ make, model, year_from: minYear, year_to: maxYear ?? null, fuel, engines: reqDesignations }),
+      });
+      if (!r.ok) throw new Error('req failed');
+      return r.json();
+    },
+  });
+
+  // Sin datos utiles (IA caida o modelo desconocido) el bloque desaparece.
+  const data = motor && motor.confidence === 'orientativo' && motor.engines?.length ? motor : null;
+  const loading = !!token && isPending;
+  const failed = !token || isError || (!loading && !data);
 
   // Filters the dealer can tweak before sourcing (prefilled from the request).
   const [showFilters, setShowFilters] = useState(false);
@@ -99,26 +122,6 @@ export default function ModelSearch({
 
   const [sourcing, setSourcing] = useState<Record<string, SourcingState>>({});
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
-
-  useEffect(() => {
-    if (!token) { setLoading(false); setFailed(true); return; }
-    let cancelled = false;
-    setLoading(true); setFailed(false);
-    fetch('/api/dealer/motorizations', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ make, model, year_from: minYear, year_to: maxYear ?? null, fuel, engines: reqDesignations }),
-    })
-      .then(r => (r.ok ? r.json() : Promise.reject(new Error('req failed'))))
-      .then((d: Motorizations) => {
-        if (cancelled) return;
-        if (d.confidence === 'orientativo' && d.engines?.length) setData(d);
-        else setFailed(true);
-      })
-      .catch(() => { if (!cancelled) setFailed(true); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, [make, model, minYear, maxYear, fuel, token, reqKey]);
 
   // Silently disappear when there's no useful advice (Groq down / no data).
   if (failed) return null;
