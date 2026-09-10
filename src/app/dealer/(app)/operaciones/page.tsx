@@ -586,50 +586,14 @@ export default function OperacionesPage() {
       </div>
 
       {/* ── Los tres niveles ──
-          En móvil no caben tres pestañas con su texto de alcance: se convierten
-          en un selector de tres, que además dice de un vistazo dónde estás. El
-          alcance de la selección baja a su propia línea. */}
-      <div className="md:hidden px-4 pt-3 pb-2 border-b border-d-border">
-        <div className="grid grid-cols-3 gap-1 p-1 rounded-xl bg-d-surface-2 border border-d-border">
-          {([
-            { key: 'ops', label: 'Operaciones', icon: ListFilter },
-            { key: 'impuestos', label: 'Impuestos', icon: Stamp },
-            { key: 'ficha', label: 'Ficha', icon: FileSignature },
-          ] as const).map(t => {
-            const on = level === t.key;
-            const Icon = t.icon;
-            return (
-              <button
-                key={t.key}
-                onClick={() => setLevel(t.key)}
-                aria-pressed={on}
-                className={`flex flex-col items-center justify-center gap-1 py-2 rounded-lg text-[12px] font-semibold transition-colors ${
-                  on ? 'bg-d-surface text-d-text shadow-[0_1px_2px_rgba(4,33,82,.08)]' : 'text-d-muted'
-                }`}
-              >
-                <Icon className={`w-4 h-4 ${on ? 'text-d-accent' : 'text-d-dim'}`} />
-                {t.label}
-              </button>
-            );
-          })}
-        </div>
-        {sel > 0 && (
-          <p className="mt-2 text-[12.5px] text-d-accent flex items-center gap-2">
-            {level === 'ops'
-              ? `${sel} ${sel === 1 ? 'operación seleccionada' : 'operaciones seleccionadas'}`
-              : `Viendo ${alcance}`}
-            <button onClick={() => setSelected(new Set())} className="text-d-dim underline underline-offset-2">
-              quitar
-            </button>
-          </p>
-        )}
-      </div>
-
-      <div className="hidden md:flex px-4 sm:px-6 items-end gap-2 border-b border-d-border md:flex-wrap">
+          Las mismas pestañas en móvil y en escritorio; lo único que cambia es
+          que en pantalla estrecha se acortan: "Ficha reducida" pasa a "Ficha" y
+          el texto de alcance se calla, para que las tres quepan sin deslizar. */}
+      <div className="px-3 sm:px-6 flex items-end gap-1 sm:gap-2 border-b border-d-border">
         {([
-          { key: 'ops', label: 'Operaciones', icon: ListFilter },
-          { key: 'impuestos', label: 'Impuestos', icon: Stamp },
-          { key: 'ficha', label: 'Ficha reducida', icon: FileSignature },
+          { key: 'ops', label: 'Operaciones', corto: 'Operaciones', icon: ListFilter },
+          { key: 'impuestos', label: 'Impuestos', corto: 'Impuestos', icon: Stamp },
+          { key: 'ficha', label: 'Ficha reducida', corto: 'Ficha', icon: FileSignature },
         ] as const).map(t => {
           const on = level === t.key;
           const Icon = t.icon;
@@ -637,16 +601,18 @@ export default function OperacionesPage() {
             <button
               key={t.key}
               onClick={() => setLevel(t.key)}
-              className={`inline-flex items-center gap-2 px-3.5 py-2.5 rounded-t-[10px] border border-b-0 -mb-px text-[13px] font-semibold transition-colors whitespace-nowrap shrink-0 ${
+              className={`inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-2.5 rounded-t-[10px] border border-b-0 -mb-px text-[12.5px] sm:text-[13px] font-semibold transition-colors whitespace-nowrap ${
                 on ? 'bg-d-surface border-d-border text-d-text' : 'bg-d-surface-2 border-d-border text-d-muted hover:text-d-text'
               }`}
             >
-              <Icon className="w-4 h-4 text-d-accent" />
-              {t.label}
+              <Icon className="w-4 h-4 text-d-accent shrink-0" />
+              <span className="sm:hidden">{t.corto}</span>
+              <span className="hidden sm:inline">{t.label}</span>
               {t.key === 'ops'
                 ? sel > 0 && (
                   <span className="inline-flex items-center gap-1.5 bg-d-accent/10 text-d-accent rounded-md px-1.5 py-0.5 text-[11.5px]">
-                    {sel === 1 ? '1 seleccionada' : `${sel} seleccionadas`}
+                    <span className="d-num">{sel}</span>
+                    <span className="hidden sm:inline">{sel === 1 ? 'seleccionada' : 'seleccionadas'}</span>
                     <span
                       role="button"
                       tabIndex={0}
@@ -657,7 +623,7 @@ export default function OperacionesPage() {
                     >✕</span>
                   </span>
                 )
-                : <span className="font-normal text-d-dim">{alcance}</span>}
+                : <span className="hidden sm:inline font-normal text-d-dim">{alcance}</span>}
             </button>
           );
         })}
