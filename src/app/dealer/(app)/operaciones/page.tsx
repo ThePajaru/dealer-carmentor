@@ -585,8 +585,47 @@ export default function OperacionesPage() {
         </label>
       </div>
 
-      {/* ── Los tres niveles ── */}
-      <div className="px-4 sm:px-6 flex items-end gap-2 border-b border-d-border overflow-x-auto md:flex-wrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      {/* ── Los tres niveles ──
+          En móvil no caben tres pestañas con su texto de alcance: se convierten
+          en un selector de tres, que además dice de un vistazo dónde estás. El
+          alcance de la selección baja a su propia línea. */}
+      <div className="md:hidden px-4 pt-3 pb-2 border-b border-d-border">
+        <div className="grid grid-cols-3 gap-1 p-1 rounded-xl bg-d-surface-2 border border-d-border">
+          {([
+            { key: 'ops', label: 'Operaciones', icon: ListFilter },
+            { key: 'impuestos', label: 'Impuestos', icon: Stamp },
+            { key: 'ficha', label: 'Ficha', icon: FileSignature },
+          ] as const).map(t => {
+            const on = level === t.key;
+            const Icon = t.icon;
+            return (
+              <button
+                key={t.key}
+                onClick={() => setLevel(t.key)}
+                aria-pressed={on}
+                className={`flex flex-col items-center justify-center gap-1 py-2 rounded-lg text-[12px] font-semibold transition-colors ${
+                  on ? 'bg-d-surface text-d-text shadow-[0_1px_2px_rgba(4,33,82,.08)]' : 'text-d-muted'
+                }`}
+              >
+                <Icon className={`w-4 h-4 ${on ? 'text-d-accent' : 'text-d-dim'}`} />
+                {t.label}
+              </button>
+            );
+          })}
+        </div>
+        {sel > 0 && (
+          <p className="mt-2 text-[12.5px] text-d-accent flex items-center gap-2">
+            {level === 'ops'
+              ? `${sel} ${sel === 1 ? 'operación seleccionada' : 'operaciones seleccionadas'}`
+              : `Viendo ${alcance}`}
+            <button onClick={() => setSelected(new Set())} className="text-d-dim underline underline-offset-2">
+              quitar
+            </button>
+          </p>
+        )}
+      </div>
+
+      <div className="hidden md:flex px-4 sm:px-6 items-end gap-2 border-b border-d-border md:flex-wrap">
         {([
           { key: 'ops', label: 'Operaciones', icon: ListFilter },
           { key: 'impuestos', label: 'Impuestos', icon: Stamp },
