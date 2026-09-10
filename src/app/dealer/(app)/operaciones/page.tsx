@@ -49,6 +49,9 @@ interface Job {
   delivery_eta: string | null;
   car: { title: string | null; image: string | null } | null;
   price: number | null; margin: number | null; margin_is_real?: boolean;
+  coste: number | null;
+  leads_count: number;
+  presupuestos_count: number;
 }
 
 interface Kpis { activas: number; entregadas: number; margenMes: number; enJuego: number }
@@ -97,6 +100,18 @@ function entregaText(j: Job): string {
   return '—';
 }
 
+/** Dias que lleva viva la operación (o los que duró, si ya está cerrada). */
+function diasAbierta(j: Job): number {
+  const fin = isClosed(j.stage) ? new Date(j.updated_at).getTime() : Date.now();
+  return Math.max(0, Math.round((fin - new Date(j.created_at).getTime()) / 86400000));
+}
+
+/** Margen sobre precio de venta. Sin precio no hay porcentaje que valga. */
+function margenPct(j: Job): number | null {
+  if (j.margin == null || !j.price) return null;
+  return Math.round((j.margin / j.price) * 100);
+}
+
 const cocheDe = (j: Job): string =>
   j.car?.title
   || [j.make, j.model].filter(Boolean).join(' ')
@@ -119,9 +134,35 @@ const COLS_OPS = [
   { key: 'etapa', label: 'Etapa' },
   { key: 'ahora', label: 'Ahora toca' },
   { key: 'tramites', label: 'Trámites' },
-  { key: 'presupuesto', label: 'Presupuesto' },
+  { key: 'analisis', label: 'Análisis' },
+  { key: 'presupuestos_n', label: 'Presupuestos' },
+  { key: 'dias', label: 'Días abierta' },
+  { key: 'presupuesto', label: 'Precio de venta' },
+  { key: 'coste', label: 'Coste real' },
   { key: 'margen', label: 'Margen' },
+  { key: 'margen_pct', label: 'Margen %' },
   { key: 'entrega', label: 'Entrega' },
+] as const;
+
+// Juegos de columnas, como los informes guardados del administrador de
+// anuncios: cada uno responde a una pregunta distinta del negocio.
+const PRESETS = [
+  {
+    key: 'rendimiento', label: 'Rendimiento',
+    cols: ['etapa', 'ahora', 'tramites', 'presupuesto', 'margen', 'entrega'],
+  },
+  {
+    key: 'margen', label: 'Informe de margen',
+    cols: ['etapa', 'presupuesto', 'coste', 'margen', 'margen_pct', 'entrega'],
+  },
+  {
+    key: 'actividad', label: 'Actividad',
+    cols: ['etapa', 'ahora', 'analisis', 'presupuestos_n', 'dias'],
+  },
+  {
+    key: 'tramites', label: 'Trámites',
+    cols: ['etapa', 'tramites', 'entrega'],
+  },
 ] as const;
 
 const CLAVE_COLS = 'dealer-operaciones-columnas-ocultas';
@@ -194,6 +235,19 @@ export default function OperacionesPage() {
       if (guardado) setOcultas(new Set(JSON.parse(guardado)));
     } catch { /* almacenamiento bloqueado: se usan todas las columnas */ }
   }, []);
+
+  // El preset activo es el que casa exactamente con las columnas visibles; si
+  // el dealer toca una casilla suelta, pasa a ser "Personalizado".
+  const presetActivo = PRESETS.find(pr =>
+    COLS_OPS.every(c => pr.cols.includes(c.key as never) !== ocultas.has(c.key)),
+  ) ?? null;
+
+  const aplicarPreset = (cols: readonly string[]) => {
+    const next = new Set(COLS_OPS.map(c => c.key).filter(k => !cols.includes(k)));
+    setOcultas(next);
+    try { localStorage.setItem(CLAVE_COLS, JSON.stringify([...next])); } catch { /* ignora */ }
+    setMenu(null);
+  };
 
   const alternarColumna = (clave: string) => {
     setOcultas(prev => {
@@ -289,6 +343,27 @@ export default function OperacionesPage() {
   const alcance = sel === 0 ? 'de todas' : sel === 1 ? 'de 1 operación' : `de ${sel} operaciones`;
 
   const margenVisible = visibles.reduce((s, j) => s + (j.margin || 0), 0);
+
+  // Metricas de cartera: no salen de ninguna tabla nueva, se derivan de las
+  // operaciones que ya tienes. Cierre = entregadas sobre las que se cerraron de
+  // un modo u otro; ciclo = dias desde que entro la solicitud hasta la entrega.
+  const metricas = useMemo(() => {
+    const entregadas = jobs.filter(j => j.stage === 'entregado');
+    const cerradas = jobs.filter(j => isClosed(j.stage));
+    const dias = (j: Job) =>
+      Math.max(0, Math.round((new Date(j.updated_at).getTime() - new Date(j.created_at).getTime()) / 86400000));
+    const ciclo = entregadas.length
+      ? Math.round(entregadas.reduce((t, j) => t + dias(j), 0) / entregadas.length)
+      : null;
+    const margenMedio = entregadas.length
+      ? Math.round(entregadas.reduce((t, j) => t + (j.margin || 0), 0) / entregadas.length)
+      : null;
+    return {
+      cierre: cerradas.length ? Math.round((entregadas.length / cerradas.length) * 100) : null,
+      ciclo,
+      margenMedio,
+    };
+  }, [jobs]);
   const ve = (clave: string) => !ocultas.has(clave);
   const nCols = 2 + COLS_OPS.filter(c => ve(c.key)).length;
 
@@ -455,6 +530,9 @@ export default function OperacionesPage() {
           <span className="text-d-dim text-[12.5px] hidden sm:inline">
             <span className="d-num">{kpis.activas}</span> activas ·{' '}
             <span className="d-num">{eur(kpis.enJuego)}</span> en juego
+            {metricas.cierre != null && <> · cierre <span className="d-num">{metricas.cierre}%</span></>}
+            {metricas.ciclo != null && <> · ciclo <span className="d-num">{metricas.ciclo}d</span></>}
+            {metricas.margenMedio != null && <> · media <span className="d-num">{eur(metricas.margenMedio)}</span></>}
           </span>
         )}
         <div className="ml-auto flex items-center gap-2">
@@ -612,11 +690,25 @@ export default function OperacionesPage() {
               disabled={level !== 'ops'}
               className="d-btn-ghost px-3 py-1.5 rounded-lg text-[12.5px] disabled:opacity-40 inline-flex items-center gap-1.5"
             >
-              <Columns3 className="w-3.5 h-3.5" /> Columnas
-              {ocultas.size > 0 && <span className="d-num text-d-dim">−{ocultas.size}</span>}
+              <Columns3 className="w-3.5 h-3.5" />
+              Columnas: {presetActivo?.label ?? 'Personalizado'}
             </button>
             {menu === 'columnas' && (
-              <div className="absolute right-0 top-full mt-1 z-30 d-card p-1.5 min-w-[190px]">
+              <div className="absolute right-0 top-full mt-1 z-30 d-card p-1.5 min-w-[220px]">
+                {PRESETS.map(pr => (
+                  <button
+                    key={pr.key}
+                    onClick={() => aplicarPreset(pr.cols)}
+                    className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-[13px] text-d-text-2 hover:bg-d-surface-2 text-left"
+                  >
+                    <span className="w-4 h-4 grid place-items-center">
+                      {presetActivo?.key === pr.key && <Check className="w-3.5 h-3.5 text-d-accent" />}
+                    </span>
+                    {pr.label}
+                  </button>
+                ))}
+                <div className="border-t border-d-border my-1.5" />
+                <p className="px-2.5 pb-1 text-[11px] uppercase tracking-wide text-d-dim">Columnas sueltas</p>
                 {COLS_OPS.map(c => (
                   <button
                     key={c.key}
@@ -738,8 +830,13 @@ export default function OperacionesPage() {
                   {ve('etapa') && <th className="whitespace-nowrap">Etapa</th>}
                   {ve('ahora') && <th>Ahora toca</th>}
                   {ve('tramites') && <th>Trámites</th>}
-                  {ve('presupuesto') && <th className="r">Presupuesto</th>}
+                  {ve('analisis') && <th className="r">Análisis</th>}
+                  {ve('presupuestos_n') && <th className="r">Presup.</th>}
+                  {ve('dias') && <th className="r">Días</th>}
+                  {ve('presupuesto') && <th className="r">Precio venta</th>}
+                  {ve('coste') && <th className="r">Coste real</th>}
                   {ve('margen') && <th className="r">Margen</th>}
+                  {ve('margen_pct') && <th className="r">Margen %</th>}
                   {ve('entrega') && <th>Entrega</th>}
                 </tr>
               </thead>
@@ -804,11 +901,28 @@ export default function OperacionesPage() {
                               </span>
                             </td>
                           )}
+                          {ve('analisis') && (
+                            <td className="r d-num text-d-muted">{j.leads_count || '—'}</td>
+                          )}
+                          {ve('presupuestos_n') && (
+                            <td className="r d-num text-d-muted">{j.presupuestos_count || '—'}</td>
+                          )}
+                          {ve('dias') && (
+                            <td className={`r d-num ${diasAbierta(j) >= 30 && !isClosed(j.stage) ? 'text-d-amber' : 'text-d-muted'}`}>
+                              {diasAbierta(j)}
+                            </td>
+                          )}
                           {ve('presupuesto') && <td className="r d-num">{eur(j.price)}</td>}
+                          {ve('coste') && <td className="r d-num text-d-muted">{eur(j.coste)}</td>}
                           {ve('margen') && (
                             <td className={`r d-num font-semibold ${j.margin == null ? 'text-d-dim' : j.margin >= 0 ? 'text-d-green' : 'text-d-red'}`}>
                               {j.margin == null ? '—' : `${j.margin >= 0 ? '+' : ''}${eur(j.margin)}`}
                               {j.margin_is_real && <span className="text-d-dim text-[10px] ml-1 font-normal">real</span>}
+                            </td>
+                          )}
+                          {ve('margen_pct') && (
+                            <td className="r d-num text-d-muted">
+                              {margenPct(j) == null ? '—' : `${margenPct(j)}%`}
                             </td>
                           )}
                           {ve('entrega') && <td className="text-d-dim text-[12.5px]">{entregaText(j)}</td>}

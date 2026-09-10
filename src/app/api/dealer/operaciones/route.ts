@@ -89,6 +89,10 @@ export async function GET(request: NextRequest) {
         margin_is_real: actualMargin != null,
         leads_count: myLeads.length,
         presupuestos_count: myPresus.length,
+        // Coste real de la operacion: compra + gastos del runner. Es lo que
+        // convierte el margen estimado en margen de verdad, y la consola lo
+        // enseña como columna en el preset de Margen.
+        coste: j.actual_purchase != null ? j.actual_purchase + expensesTotal : null,
       };
     });
 
