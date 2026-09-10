@@ -85,6 +85,49 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   );
 }
 
+/** Casillas del modelo 576 leídas del permiso alemán por el lector de documentos. */
+function Datos576({ payload }: { payload: Record<string, unknown> }) {
+  const d = payload.datos_576 as {
+    bastidor?: string | null; marca?: string | null; modelo_tipo?: string | null;
+    fecha_puesta_servicio?: string | null; cilindrada_cc?: number | null;
+    combustible?: string | null; co2_g_km?: number | null; categoria_cee?: string | null;
+    km_utilizacion?: number | null; potencia_kw?: number | null;
+    notas?: string | null; leido_de?: string[];
+  } | null | undefined;
+  if (!d) return null;
+
+  const filas: [string, string | number | null | undefined][] = [
+    ['Bastidor', d.bastidor],
+    ['Marca', d.marca],
+    ['Modelo · Tipo', d.modelo_tipo],
+    ['Puesta en servicio', d.fecha_puesta_servicio],
+    ['Cilindrada (CC)', d.cilindrada_cc],
+    ['Combustible', d.combustible],
+    ['CO2 (g/km)', d.co2_g_km],
+    ['Clasificación CEE', d.categoria_cee],
+    ['Km utilización', d.km_utilizacion],
+  ];
+
+  return (
+    <div className="mt-3 rounded-lg border border-d-border p-3">
+      <p className="text-[11px] uppercase tracking-wide text-d-dim mb-2">
+        Casillas del 576 · leídas de {(d.leido_de || []).join(' · ') || 'la documentación'}
+      </p>
+      <div className="grid gap-x-4 sm:grid-cols-2">
+        {filas.map(([etiqueta, valor]) => (
+          <div key={etiqueta} className="flex gap-3 py-1 text-[13px]">
+            <span className="text-d-dim w-[140px] shrink-0">{etiqueta}</span>
+            {valor != null && valor !== ''
+              ? <span className="text-d-text d-num">{valor}</span>
+              : <span className="text-d-amber">falta, míralo en la foto</span>}
+          </div>
+        ))}
+      </div>
+      {d.notas && <p className="text-d-amber text-[12.5px] mt-2">{d.notas}</p>}
+    </div>
+  );
+}
+
 /** Lo que el dealer aportó al encargar — distinto en cada servicio. */
 function Payload({ order }: { order: AdminOrder }) {
   const p = order.payload || {};
@@ -111,6 +154,7 @@ function Payload({ order }: { order: AdminOrder }) {
             : '—'}
           <span className="text-d-dim"> · lo fija Hacienda con su valoración</span>
         </Row>
+        <Datos576 payload={p} />
       </div>
     );
   }

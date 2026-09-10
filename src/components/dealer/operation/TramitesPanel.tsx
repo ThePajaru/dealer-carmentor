@@ -10,6 +10,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Stamp, FileSignature, Loader2, Check, Clock, AlertTriangle, ExternalLink, Camera,
+  ScanLine,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { calculateIEDMT, REGION_LABELS, type IEDMTInputs, type Region } from '@/lib/iedmt';
@@ -124,6 +125,22 @@ export default function TramitesPanel({ requestId, token, runnerReport, onOrders
   const [co2, setCo2] = useState<string>(
     pf?.co2 != null ? String(pf.co2) : prefill?.co2 != null ? String(prefill.co2) : '',
   );
+  // Lectura de los papeles que el runner ya fotografio.
+  const [leyendo, setLeyendo] = useState(false);
+  const [lectura, setLectura] = useState<{
+    campos: {
+      fecha_puesta_servicio: string | null; co2_g_km: number | null;
+      combustible: string | null; cilindrada_cc: number | null;
+      categoria_cee: string | null; bastidor: string | null;
+      marca: string | null; modelo_tipo: string | null;
+      potencia_kw: number | null; notas: string | null;
+    };
+    km_utilizacion: number | null;
+    leidas: string[];
+    faltan_en_576: string[];
+  } | null>(null);
+  const [errorLectura, setErrorLectura] = useState<string | null>(null);
+
   const [municipio, setMunicipio] = useState('');
   const [provincia, setProvincia] = useState('');
   const [cvf, setCvf] = useState('');
@@ -186,6 +203,30 @@ export default function TramitesPanel({ requestId, token, runnerReport, onOrders
   // informe no hay expediente, asi que no hay nada que firmar.
   const hayInforme = !!runnerReport?.submitted_at;
 
+  const leerDocumentos = async () => {
+    if (!token) return;
+    setLeyendo(true);
+    setErrorLectura(null);
+    try {
+      const res = await fetch('/api/dealer/tramites/leer-documentos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ request_id: requestId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'No se pudieron leer los documentos');
+      setLectura(data);
+      // Solo se rellena lo que el papel dice de verdad. Lo que venga null se
+      // queda como estaba: es mejor un hueco que un dato inventado.
+      if (data.campos?.co2_g_km != null) setCo2(String(data.campos.co2_g_km));
+      if (data.campos?.fecha_puesta_servicio) setPrimeraMat(data.campos.fecha_puesta_servicio);
+    } catch (e) {
+      setErrorLectura(e instanceof Error ? e.message : 'No se pudieron leer los documentos');
+    } finally {
+      setLeyendo(false);
+    }
+  };
+
   const encargar = async (kind: ServiceKey) => {
     if (!token) return;
     setOrdering(kind);
@@ -203,6 +244,11 @@ export default function TramitesPanel({ requestId, token, runnerReport, onOrders
         primera_matriculacion: primeraMat || null,
         iedmt_estimado: iedmt?.totalAPagar ?? null,
         coche: prefill?.carTitle ?? null,
+        // Casillas del 576 leidas del permiso aleman, para que el gestor no las
+        // vuelva a teclear mirando la foto.
+        datos_576: lectura
+          ? { ...lectura.campos, km_utilizacion: lectura.km_utilizacion, leido_de: lectura.leidas }
+          : null,
       }
       : {
         photos: expediente.filter(p => p.url).map(p => ({ key: p.key, label: p.label, url: p.url })),
@@ -285,6 +331,70 @@ export default function TramitesPanel({ requestId, token, runnerReport, onOrders
           </div>
         ) : (
           <>
+            {/* El permiso aleman que el runner fotografio trae el CO2 (campo
+                V.7) y la fecha de matriculacion (B), que son justo los dos
+                datos que mueven el tramo del 576. */}
+            {hayInforme && (
+              <div className="rounded-lg border border-d-border/70 p-3 mb-3">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <p className="text-[13px] text-d-text-2">
+                    <span className="font-medium text-d-text">Leer los papeles del runner</span>
+                    <span className="text-d-dim"> · rellena las casillas del modelo 576 con el permiso alemán</span>
+                  </p>
+                  <Button onClick={leerDocumentos} disabled={leyendo} className="d-btn-ghost text-xs">
+                    {leyendo ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : <ScanLine className="w-3.5 h-3.5 mr-1.5" />}
+                    {leyendo ? 'Leyendo…' : lectura ? 'Volver a leer' : 'Leer documentos'}
+                  </Button>
+                </div>
+
+                {errorLectura && (
+                  <p className="text-d-amber text-[12.5px] mt-2 flex items-start gap-1.5">
+                    <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" /> {errorLectura}
+                  </p>
+                )}
+
+                {lectura && (
+                  <div className="mt-2.5 text-[12.5px] space-y-1.5">
+                    <p className="text-d-dim">
+                      Leído de: {lectura.leidas.join(' · ')}
+                    </p>
+                    <div className="grid gap-x-4 gap-y-1 sm:grid-cols-2">
+                      {([
+                        ['Bastidor', lectura.campos.bastidor],
+                        ['Marca', lectura.campos.marca],
+                        ['Modelo · Tipo', lectura.campos.modelo_tipo],
+                        ['Puesta en servicio', lectura.campos.fecha_puesta_servicio],
+                        ['Cilindrada', lectura.campos.cilindrada_cc != null ? `${lectura.campos.cilindrada_cc} cc` : null],
+                        ['Combustible', lectura.campos.combustible],
+                        ['CO2', lectura.campos.co2_g_km != null ? `${lectura.campos.co2_g_km} g/km` : null],
+                        ['Clasificación CEE', lectura.campos.categoria_cee],
+                        ['Km de utilización', lectura.km_utilizacion != null ? `${lectura.km_utilizacion.toLocaleString('es-ES')} km` : null],
+                        ['Potencia', lectura.campos.potencia_kw != null ? `${lectura.campos.potencia_kw} kW` : null],
+                      ] as const).map(([etiqueta, valor]) => (
+                        <span key={etiqueta} className="flex gap-2">
+                          <span className="text-d-dim w-[110px] shrink-0">{etiqueta}</span>
+                          {valor
+                            ? <span className="text-d-text d-num">{valor}</span>
+                            : <span className="text-d-amber">no se lee</span>}
+                        </span>
+                      ))}
+                    </div>
+                    {lectura.campos.notas && (
+                      <p className="text-d-amber flex items-start gap-1.5">
+                        <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" /> {lectura.campos.notas}
+                      </p>
+                    )}
+                    <p className="text-d-dim leading-snug">
+                      El 576 pide además <span className="text-d-text-2">{(lectura.faltan_en_576 || []).join(', ')}</span>.
+                      La tarjeta ITV nace de la ficha técnica reducida, que aún no existe con el coche
+                      en Alemania, y la base imponible sale de las tablas de Hacienda. Revisa siempre
+                      lo leído antes de encargar: de aquí sale una declaración firmada.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="grid gap-2.5 sm:grid-cols-2">
               <label className="block space-y-1">
                 <span className="block text-[11px] text-d-dim">Comunidad donde se matricula (576)</span>
