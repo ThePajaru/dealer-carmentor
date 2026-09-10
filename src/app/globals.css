@@ -299,7 +299,11 @@ html:has(.runner-black), body:has(.runner-black){ background:#000; }
   pointer-events:none;
   background:radial-gradient(ellipse 70% 55% at 0% 100%, rgba(107,131,186,.10), transparent 60%);
 }
-.dealer-root > *{position:relative;z-index:1}
+/* El :not() no es adorno: esta regla va DESPUES de las utilidades de Tailwind y
+   con la misma especificidad, asi que sin el pisaba el .fixed del menu lateral.
+   En movil el sidebar seguia ocupando sus 232px en el flujo aunque estuviera
+   desplazado fuera de pantalla, y la app se quedaba en 99px de ancho. */
+.dealer-root > *:not(.fixed):not(.absolute){position:relative;z-index:1}
 /* Mono tabular figures for all numeric data */
 .d-num{font-family:var(--font-mono),ui-monospace,SFMono-Regular,Menlo,monospace;font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1;letter-spacing:0}
 

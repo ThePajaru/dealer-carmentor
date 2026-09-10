@@ -1543,11 +1543,14 @@ export default function ClientDetailPage() {
             const hasReport = !!r && (!!r.razonamiento || !!r.veredicto || r.fallos.length > 0 || !!r.score_radar);
             return (
               <div key={lead.id} className={`rounded-xl border p-4 transition-colors ${lead.is_shortlisted ? 'border-d-accent/30 bg-d-accent/5' : 'border-d-border'}`}>
-                <div className="flex gap-4">
+                {/* En movil la fila se rompe: con los botones al lado, la columna
+                    de datos se quedaba en 90px y partia "3 riesgos del modelo"
+                    en cuatro lineas. */}
+                <div className="flex flex-wrap gap-4">
                   {analysis?.car_image_url && (
                     <img src={analysis.car_image_url} alt="" className="w-16 h-12 sm:w-24 sm:h-16 rounded-lg object-cover shrink-0" />
                   )}
-                  <div className="flex-1 min-w-0">
+                  <div className="flex-1 min-w-[190px]">
                     <div className="flex items-center gap-2 min-w-0">
                       <p className="text-d-text text-sm font-semibold truncate">
                         {analysisPending || analysisFailed
@@ -1610,7 +1613,7 @@ export default function ClientDetailPage() {
                       </div>
                     )}
                   </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
+                  <div className="flex items-center gap-1.5 shrink-0 w-full sm:w-auto justify-end">
                     {hasReport && (
                       <Tip label={isExpanded ? 'Ocultar análisis' : 'Ver análisis'}>
                         <button onClick={() => toggleLead(lead.id)} className="text-d-dim hover:text-d-muted p-2 sm:p-1.5 rounded-lg hover:bg-d-surface-2 transition-colors">

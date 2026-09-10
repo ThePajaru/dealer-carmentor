@@ -517,10 +517,11 @@ export default function OperacionesPage() {
       <CaptureLinksModal open={shareOpen} onClose={() => setShareOpen(false)} />
 
       {/* ── Cabecera ── */}
-      <header className="flex items-center gap-3 flex-wrap px-4 sm:px-6 py-3 border-b border-d-border">
+      {/* pl-16 en movil: la hamburguesa del menu va fija arriba a la izquierda. */}
+      <header className="flex items-center gap-3 flex-wrap pl-16 pr-4 sm:px-6 py-3 border-b border-d-border">
         <h1 className="text-[19px] font-bold text-d-text tracking-tight">Operaciones</h1>
         {kpis && (
-          <span className="inline-flex items-center gap-2 border border-d-border rounded-full pl-2 pr-3 py-1">
+          <span className="inline-flex items-center gap-2 border border-d-border rounded-full pl-2 pr-3 py-1 whitespace-nowrap">
             <span className="w-2 h-2 rounded-full bg-d-green" />
             <span className="text-d-muted text-[12.5px]">Margen del mes</span>
             <b className="text-d-green d-num text-[13px]">{eur(kpis.margenMes)}</b>
@@ -551,7 +552,7 @@ export default function OperacionesPage() {
       </header>
 
       {/* ── Vistas guardadas ── */}
-      <div className="border-b border-d-border px-4 sm:px-6 flex items-center gap-1 flex-wrap">
+      <div className="border-b border-d-border px-4 sm:px-6 flex items-center gap-1 overflow-x-auto md:flex-wrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {VIEWS.map(v => {
           const n = jobs.filter(v.test).length;
           const on = v.key === view;
@@ -559,7 +560,7 @@ export default function OperacionesPage() {
             <button
               key={v.key}
               onClick={() => setView(v.key)}
-              className={`px-3 py-2.5 text-[12.5px] rounded-t-lg border border-b-0 -mb-px transition-colors ${
+              className={`px-3 py-2.5 text-[12.5px] rounded-t-lg border border-b-0 -mb-px transition-colors whitespace-nowrap shrink-0 ${
                 on
                   ? 'bg-d-surface border-d-border text-d-text font-semibold'
                   : 'border-transparent text-d-muted hover:text-d-text hover:bg-d-surface-2'
@@ -585,7 +586,7 @@ export default function OperacionesPage() {
       </div>
 
       {/* ── Los tres niveles ── */}
-      <div className="px-4 sm:px-6 flex items-end gap-2 border-b border-d-border flex-wrap">
+      <div className="px-4 sm:px-6 flex items-end gap-2 border-b border-d-border overflow-x-auto md:flex-wrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {([
           { key: 'ops', label: 'Operaciones', icon: ListFilter },
           { key: 'impuestos', label: 'Impuestos', icon: Stamp },
@@ -597,7 +598,7 @@ export default function OperacionesPage() {
             <button
               key={t.key}
               onClick={() => setLevel(t.key)}
-              className={`inline-flex items-center gap-2 px-3.5 py-2.5 rounded-t-[10px] border border-b-0 -mb-px text-[13px] font-semibold transition-colors ${
+              className={`inline-flex items-center gap-2 px-3.5 py-2.5 rounded-t-[10px] border border-b-0 -mb-px text-[13px] font-semibold transition-colors whitespace-nowrap shrink-0 ${
                 on ? 'bg-d-surface border-d-border text-d-text' : 'bg-d-surface-2 border-d-border text-d-muted hover:text-d-text'
               }`}
             >
@@ -629,6 +630,9 @@ export default function OperacionesPage() {
           <Plus className="w-3.5 h-3.5" /> Crear
         </Link>
 
+        {/* En movil los botones apagados solo ocupan sitio: el grupo aparece
+            cuando hay una operacion marcada. En escritorio siempre estan. */}
+        <div className={`items-center gap-1.5 ${sel === 0 ? 'hidden md:flex' : 'flex'}`}>
         <button
           onClick={duplicar}
           disabled={!unaSeleccionada || trabajando !== null}
@@ -659,12 +663,12 @@ export default function OperacionesPage() {
           {trabajando === 'eliminar' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
         </button>
 
-        <span className="w-px h-5 bg-d-border mx-1" />
+        <span className="w-px h-5 bg-d-border mx-1 hidden md:block" />
 
         {unaSeleccionada ? (
           <Link
             href={`/dealer/clientes/${unaSeleccionada}`}
-            className="d-btn-ghost px-3 py-1.5 rounded-lg text-[12.5px] inline-flex items-center gap-1.5"
+            className="d-btn-ghost px-3 py-1.5 rounded-lg text-[12.5px] inline-flex items-center gap-1.5 whitespace-nowrap"
           >
             <Stamp className="w-3.5 h-3.5" /> Encargar trámites
           </Link>
@@ -672,11 +676,12 @@ export default function OperacionesPage() {
           <button
             disabled
             title={sel > 1 ? 'De momento los trámites se encargan de uno en uno' : 'Marca una operación'}
-            className="d-btn-ghost px-3 py-1.5 rounded-lg text-[12.5px] disabled:opacity-40 inline-flex items-center gap-1.5"
+            className="d-btn-ghost px-3 py-1.5 rounded-lg text-[12.5px] disabled:opacity-40 inline-flex items-center gap-1.5 whitespace-nowrap"
           >
             <Stamp className="w-3.5 h-3.5" /> Encargar trámites
           </button>
         )}
+        </div>
 
         <div className="ml-auto flex items-center gap-1.5" ref={menuRef}>
           {/* Columnas y Desglose solo existen en el nivel de operaciones: en
@@ -684,7 +689,9 @@ export default function OperacionesPage() {
               que nunca se enciende parece roto. Exportar si vale en los tres. */}
           {level === 'ops' && (
           <>
-          <div className="relative">
+          {/* Configurar columnas en una pantalla de 375px no lleva a ningun
+              sitio: en movil manda la tarjeta, que ya enseña lo que importa. */}
+          <div className="relative hidden md:block">
             <button
               onClick={() => setMenu(m => (m === 'columnas' ? null : 'columnas'))}
               disabled={level !== 'ops'}
@@ -726,7 +733,7 @@ export default function OperacionesPage() {
           </div>
 
           {/* Desglose — agrupa por etapa con subtotal de margen. */}
-          <div className="relative">
+          <div className="relative hidden md:block">
             <button
               onClick={() => setMenu(m => (m === 'desglose' ? null : 'desglose'))}
               disabled={level !== 'ops'}
@@ -810,7 +817,157 @@ export default function OperacionesPage() {
         </div>
       ) : (
         <>
-        <div className="overflow-x-auto min-h-[420px]">
+        {/* ── Móvil: una tarjeta por fila. Una tabla de doce columnas en 375px
+            solo se puede leer arrastrando de lado, que es lo mismo que no
+            poder leerla. ── */}
+        <ul className="md:hidden divide-y divide-d-border">
+          {level === 'ops' && visibles.map((j, fila) => {
+            const def = stageDef(j.stage);
+            const marcada = selected.has(j.id);
+            const t = tramitesDe.get(j.id) || { impuestos: 'none' as TramiteState, ficha: 'none' as TramiteState };
+            const dot = def?.dot || DOT_WAIT;
+            return (
+              <li
+                key={j.id}
+                className={`px-4 py-3 ${marcada ? 'bg-d-accent/[0.07]' : fila % 2 === 1 ? 'bg-[#e7edf7]' : 'bg-[#f8fafd]'}`}
+              >
+                <div className="flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    checked={marcada}
+                    onChange={() => toggle(j.id)}
+                    aria-label={`Seleccionar ${j.client_name}`}
+                    className="w-[17px] h-[17px] accent-[#2b5bd7] mt-0.5 shrink-0"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <Link href={`/dealer/clientes/${j.id}`} className="font-semibold text-d-text leading-tight">
+                        {j.client_name}
+                      </Link>
+                      <span className="inline-flex items-center gap-1.5 text-[12px] text-d-muted shrink-0 whitespace-nowrap">
+                        <Dot color={dot} /> {def?.label || j.stage}
+                      </span>
+                    </div>
+                    <p className="text-d-dim text-[12px] truncate mt-0.5">{cocheDe(j)}</p>
+                    {!isClosed(j.stage) && def?.next && (
+                      <p className={`text-[12.5px] mt-1.5 ${dot === DOT_ACTION ? 'text-d-amber font-medium' : 'text-d-dim'}`}>
+                        {def.next}
+                      </p>
+                    )}
+                    <div className="flex items-center gap-2 mt-2">
+                      <TramiteChip label={TR_LABEL.impuestos} state={t.impuestos} />
+                      <TramiteChip label={TR_LABEL.ficha_reducida} state={t.ficha} />
+                      {j.margin != null && (
+                        <span className={`ml-auto d-num text-[13px] font-semibold ${j.margin >= 0 ? 'text-d-green' : 'text-d-red'}`}>
+                          {j.margin >= 0 ? '+' : ''}{eur(j.margin)}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-d-dim text-[11.5px] mt-1.5">
+                      {entregaText(j) !== '—' && <>{entregaText(j)} · </>}
+                      <span className="d-num">{diasAbierta(j)}</span>{' '}
+                      {diasAbierta(j) === 1 ? 'día' : 'días'}
+                    </p>
+                  </div>
+                </div>
+              </li>
+            );
+          })}
+
+          {level === 'impuestos' && impuestos.map((o, fila) => {
+            const v = o.payload as {
+              coche?: string; region_label?: string; municipio?: string;
+              iedmt_estimado?: number; co2?: number;
+            };
+            const files = o.result?.files || [];
+            return (
+              <li key={o.id} className={`px-4 py-3 ${fila % 2 === 1 ? 'bg-[#e7edf7]' : 'bg-[#f8fafd]'}`}>
+                <div className="flex items-start justify-between gap-2">
+                  <Link href={`/dealer/clientes/${o.request_id}`} className="font-semibold text-d-text leading-tight">
+                    {v.coche || 'Vehículo'}
+                  </Link>
+                  <StatusPill status={o.status} />
+                </div>
+                <p className="text-d-dim text-[12px] mt-0.5">{o.dealer_client_requests?.client_name}</p>
+                <div className="flex items-baseline gap-2 mt-2 flex-wrap text-[12.5px]">
+                  <span className="text-d-text-2">{v.region_label || '—'}</span>
+                  {v.municipio && <span className="text-d-dim">· {v.municipio}</span>}
+                  <span className="ml-auto d-num text-d-text font-semibold">{eur(v.iedmt_estimado)}</span>
+                </div>
+                {files.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {files.map(f => f.url && (
+                      <a key={f.path} href={f.url} target="_blank" rel="noopener" className="d-link text-[12.5px] inline-flex items-center gap-1">
+                        <ExternalLink className="w-3 h-3" /> {f.label}
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </li>
+            );
+          })}
+
+          {level === 'ficha' && fichas.map((o, fila) => {
+            const v = o.payload as { coche?: string; photos?: unknown[]; faltan?: string[] };
+            const hechas = Array.isArray(v.photos) ? v.photos.length : 0;
+            const faltan = Array.isArray(v.faltan) ? v.faltan.length : 0;
+            const total = hechas + faltan;
+            const pct = total > 0 ? Math.round((hechas / total) * 100) : 0;
+            const files = o.result?.files || [];
+            return (
+              <li key={o.id} className={`px-4 py-3 ${fila % 2 === 1 ? 'bg-[#e7edf7]' : 'bg-[#f8fafd]'}`}>
+                <div className="flex items-start justify-between gap-2">
+                  <Link href={`/dealer/clientes/${o.request_id}`} className="font-semibold text-d-text leading-tight">
+                    {v.coche || 'Vehículo'}
+                  </Link>
+                  <StatusPill status={o.status} />
+                </div>
+                <p className="text-d-dim text-[12px] mt-0.5">{o.dealer_client_requests?.client_name}</p>
+                <div className="flex items-center gap-2 mt-2">
+                  <span className="w-[70px] h-[5px] rounded-full bg-d-surface-3 overflow-hidden">
+                    <span
+                      className="block h-full rounded-full"
+                      style={{ width: `${pct}%`, background: pct === 100 ? 'var(--color-d-green)' : '#d9891a' }}
+                    />
+                  </span>
+                  <span className="d-num text-[12.5px] text-d-text-2">{hechas}/{total || 6} fotos</span>
+                </div>
+                {files.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {files.map(f => f.url && (
+                      <a key={f.path} href={f.url} target="_blank" rel="noopener" className="d-link text-[12.5px] inline-flex items-center gap-1">
+                        <ExternalLink className="w-3 h-3" /> {f.label}
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </li>
+            );
+          })}
+
+          {((level === 'ops' && visibles.length === 0)
+            || (level === 'impuestos' && impuestos.length === 0)
+            || (level === 'ficha' && fichas.length === 0)) && (
+            <li className="px-4 py-10 text-center text-d-dim text-[13px]">
+              {level === 'ops'
+                ? `Ninguna operación en esta vista${busca ? ' con esa búsqueda' : ''}.`
+                : sel > 0
+                  ? 'Las operaciones marcadas no tienen este trámite encargado.'
+                  : 'Todavía no has encargado ninguno.'}
+            </li>
+          )}
+        </ul>
+
+        {/* Resumen del móvil: el pie de la tabla no existe aquí. */}
+        {level === 'ops' && visibles.length > 0 && (
+          <p className="md:hidden px-4 py-3 text-[12.5px] text-d-muted bg-d-surface-2 border-t border-d-border text-center">
+            <b className="d-num text-d-text">{visibles.length}</b>{' '}
+            {visibles.length === 1 ? 'operación' : 'operaciones'} · margen{' '}
+            <span className="d-num text-d-text">{eur(margenVisible)}</span>
+          </p>
+        )}
+
+        <div className="hidden md:block overflow-x-auto min-h-[420px]">
           {/* min-h: con una o dos filas la tabla se quedaba flotando sobre medio
               metro de blanco y la pantalla parecia a medio cargar. */}
           {level === 'ops' && (
