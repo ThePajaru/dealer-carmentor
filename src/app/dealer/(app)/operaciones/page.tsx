@@ -517,53 +517,61 @@ export default function OperacionesPage() {
       <CaptureLinksModal open={shareOpen} onClose={() => setShareOpen(false)} />
 
       {/* ── Cabecera ── */}
-      {/* Cabecera. En móvil la hamburguesa va fija arriba a la izquierda (de ahí
-          el hueco de 60px) y el chip de margen no cabe en la misma línea que el
-          título y los botones: baja a su propia fila. El orden cambia con el
-          tamaño para que en ancho vuelva a leerse título · margen · métricas. */}
-      <header className="flex flex-wrap items-center gap-x-3 gap-y-2 pl-[60px] pr-3 sm:pl-6 sm:pr-6 py-2.5 sm:py-3 border-b border-d-border">
-        <h1 className="order-1 text-[18px] sm:text-[19px] font-bold text-d-text tracking-tight leading-none">
-          Operaciones
-        </h1>
+      {/* Cabecera.
+          En móvil es una barra de aplicación de una sola línea: la hamburguesa
+          del menú va FIJA en y=16..60, así que la fila mide 76px y centra su
+          contenido justo a la altura del icono — de otro modo el título y los
+          botones flotan por encima o por debajo de él. El resumen de cartera
+          baja a una línea de texto plano: el chip con borde, a ese tamaño,
+          competía con el título por la atención. */}
+      <header className="bg-d-surface border-b border-d-border">
+        <div className="flex items-center gap-3 h-[76px] pl-[60px] pr-3 sm:h-auto sm:py-3 sm:pl-6 sm:pr-6">
+          <h1 className="text-[19px] font-bold text-d-text tracking-tight leading-none">Operaciones</h1>
 
-        <div className="order-2 sm:order-4 ml-auto flex items-center gap-2 shrink-0">
-          <button
-            onClick={() => refetch()}
-            className="d-btn-ghost p-2 rounded-lg"
-            title="Actualizar"
-            aria-label="Actualizar"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${isFetching ? 'animate-spin' : ''}`} />
-          </button>
-          <button
-            onClick={() => setShareOpen(true)}
-            className="d-btn-ghost inline-flex items-center gap-1.5 p-2 sm:px-3 sm:py-1.5 rounded-lg text-[12.5px]"
-            aria-label="Enlace de captación"
-          >
-            <Share2 className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Enlace de captación</span>
-          </button>
-        </div>
+          {kpis && (
+            <span className="hidden sm:inline-flex items-center gap-2 border border-d-border rounded-full pl-2 pr-3 py-1 whitespace-nowrap">
+              <span className="w-2 h-2 rounded-full bg-d-green" />
+              <span className="text-d-muted text-[12.5px]">Margen del mes</span>
+              <b className="text-d-green d-num text-[13px]">{eur(kpis.margenMes)}</b>
+            </span>
+          )}
 
-        {kpis && (
-          <span className="order-3 sm:order-2 inline-flex items-center gap-2 border border-d-border rounded-full pl-2 pr-3 py-1 whitespace-nowrap">
-            <span className="w-2 h-2 rounded-full bg-d-green" />
-            <span className="text-d-muted text-[12.5px]">Margen del mes</span>
-            <b className="text-d-green d-num text-[13px]">{eur(kpis.margenMes)}</b>
-          </span>
-        )}
-
-        {kpis && (
-          <span className="order-4 sm:order-3 text-d-dim text-[12.5px] whitespace-nowrap">
-            <span className="d-num">{kpis.activas}</span> activas ·{' '}
-            <span className="d-num">{eur(kpis.enJuego)}</span> en juego
-            {/* Cierre, ciclo y media solo desde tablet: en 375px la linea se
-                cortaba a la mitad, que es peor que no enseñarlas. */}
-            <span className="hidden sm:inline">
+          {kpis && (
+            <span className="hidden sm:inline text-d-dim text-[12.5px] whitespace-nowrap">
+              <span className="d-num">{kpis.activas}</span> activas ·{' '}
+              <span className="d-num">{eur(kpis.enJuego)}</span> en juego
               {metricas.cierre != null && <> · cierre <span className="d-num">{metricas.cierre}%</span></>}
               {metricas.ciclo != null && <> · ciclo <span className="d-num">{metricas.ciclo}d</span></>}
               {metricas.margenMedio != null && <> · media <span className="d-num">{eur(metricas.margenMedio)}</span></>}
             </span>
-          </span>
+          )}
+
+          <div className="ml-auto flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => refetch()}
+              className="d-btn-ghost p-2 rounded-lg"
+              title="Actualizar"
+              aria-label="Actualizar"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isFetching ? 'animate-spin' : ''}`} />
+            </button>
+            <button
+              onClick={() => setShareOpen(true)}
+              className="d-btn-ghost inline-flex items-center gap-1.5 p-2 sm:px-3 sm:py-1.5 rounded-lg text-[12.5px]"
+              aria-label="Enlace de captación"
+            >
+              <Share2 className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Enlace de captación</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Resumen de cartera, solo en móvil: una línea, sin caja. */}
+        {kpis && (
+          <p className="sm:hidden px-4 pb-2.5 -mt-1 text-[12.5px] text-d-dim">
+            Margen del mes <b className="text-d-green d-num">{eur(kpis.margenMes)}</b>
+            {' · '}<span className="d-num">{kpis.activas}</span> activas
+            {' · '}<span className="d-num">{eur(kpis.enJuego)}</span> en juego
+          </p>
         )}
       </header>
 
