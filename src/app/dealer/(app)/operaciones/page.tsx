@@ -717,7 +717,9 @@ export default function OperacionesPage() {
           </p>
         </div>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto min-h-[420px]">
+          {/* min-h: con una o dos filas la tabla se quedaba flotando sobre medio
+              metro de blanco y la pantalla parecia a medio cargar. */}
           {level === 'ops' && (
             <table className="d-table w-full min-w-[720px]">
               <thead>
@@ -993,6 +995,16 @@ export default function OperacionesPage() {
                 </tfoot>
               )}
             </table>
+          )}
+
+          {/* Con la tabla casi vacia, decir que va a aparecer ahi es mejor que
+              dejar el hueco mudo. Desaparece en cuanto hay trabajo de verdad. */}
+          {level !== 'ops' && (level === 'impuestos' ? impuestos.length : fichas.length) < 3 && (
+            <p className="px-4 sm:px-6 py-5 text-d-dim text-[13px]">
+              {level === 'impuestos'
+                ? 'Aquí van apareciendo los impuestos de cada coche según los encargas desde su operación: el 576 y el IVTM, con sus justificantes cuando el gestor los presenta.'
+                : 'Aquí van apareciendo las fichas técnicas reducidas que encargas desde cada operación, con el estado del expediente de fotos y el PDF firmado por el ingeniero.'}
+            </p>
           )}
         </div>
       )}
