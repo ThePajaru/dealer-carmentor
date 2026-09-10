@@ -401,9 +401,11 @@ export default function OperacionesPage() {
       });
       const data = await res.json();
       if (!res.ok || !data.id) throw new Error(data.error || 'No se pudo duplicar');
-      await queryClient.invalidateQueries({ queryKey: ['dealer', 'operaciones'] });
       setSelected(new Set());
+      // Navegar primero y refrescar la lista despues, sin esperar: al reves, el
+      // refetch se cruza con la navegacion y el destino puede perderse.
       router.push(`/dealer/clientes/${data.id}`);
+      void queryClient.invalidateQueries({ queryKey: ['dealer', 'operaciones'] });
     } catch (e) {
       setAviso({ texto: e instanceof Error ? e.message : 'No se pudo duplicar', malo: true });
     } finally {
