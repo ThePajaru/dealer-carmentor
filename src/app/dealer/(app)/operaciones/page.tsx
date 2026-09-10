@@ -8,14 +8,15 @@
 // e hijo como el conjunto y el anuncio de Facebook, son dos servicios hermanos
 // de la misma operación. Encadenarlos vaciaría un nivel sin motivo.
 
-import { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import Link from 'next/link';
 import {
   Search, Share2, Plus, Copy, Pencil, Trash2, Columns3, SlidersHorizontal,
   Download, Stamp, FileSignature, ListFilter, ExternalLink,
-  Workflow, RefreshCw,
+  Workflow, RefreshCw, Check, Loader2, AlertTriangle, X, Layers,
 } from 'lucide-react';
 import CaptureLinksModal from '@/components/dealer/CaptureLinksModal';
 import { OperacionesSkeleton } from '@/components/dealer/DealerSkeletons';
@@ -23,14 +24,24 @@ import {
   ACTION_STAGES, stageDef, isClosed, DOT_MOVING, DOT_ACTION, DOT_WAIT,
 } from '@/lib/dealer/pipeline';
 import { SERVICE_STATUS_LABELS, type ServiceKey, type ServiceStatus } from '@/lib/dealer/services';
+import { STAGES } from '@/lib/dealer/pipeline';
 
 /* ══════════ Tipos ══════════ */
 
 interface TransitProgress { comprado?: boolean; en_transporte?: boolean; en_espana?: boolean }
 
+interface VehicleProfile {
+  make?: string | null; model?: string | null; max_price?: number | null;
+  max_km?: number | null; min_year?: number | null; fuel?: string | null;
+  transmission?: string | null; [k: string]: unknown;
+}
+
 interface Job {
   id: string;
   client_name: string;
+  client_phone: string | null;
+  client_email: string | null;
+  vehicles?: VehicleProfile[];
   stage: string;
   make: string | null; model: string | null; max_price: number | null;
   created_at: string; updated_at: string;
@@ -100,6 +111,21 @@ const VIEWS = [
   { key: 'entregadas', label: 'Entregadas', test: (j: Job) => isClosed(j.stage) },
 ] as const;
 
+/* ══════════ Columnas que se pueden ocultar ══════════ */
+
+// La primera columna (Operación) no se puede esconder: sin ella la fila no
+// identifica nada. El resto sí — es lo que pedía la pantalla de 14 pulgadas.
+const COLS_OPS = [
+  { key: 'etapa', label: 'Etapa' },
+  { key: 'ahora', label: 'Ahora toca' },
+  { key: 'tramites', label: 'Trámites' },
+  { key: 'presupuesto', label: 'Presupuesto' },
+  { key: 'margen', label: 'Margen' },
+  { key: 'entrega', label: 'Entrega' },
+] as const;
+
+const CLAVE_COLS = 'dealer-operaciones-columnas-ocultas';
+
 /* ══════════ Piezas ══════════ */
 
 function Dot({ color }: { color: string }) {
@@ -148,6 +174,51 @@ export default function OperacionesPage() {
   const [q, setQ] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [shareOpen, setShareOpen] = useState(false);
+
+  const [ocultas, setOcultas] = useState<Set<string>>(new Set());
+  const [agrupar, setAgrupar] = useState(false);
+  const [menu, setMenu] = useState<'columnas' | 'desglose' | null>(null);
+  const [trabajando, setTrabajando] = useState<string | null>(null);
+  const [aviso, setAviso] = useState<{ texto: string; malo?: boolean } | null>(null);
+  const [confirmarBorrado, setConfirmarBorrado] = useState(false);
+
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const menuRef = useRef<HTMLDivElement | null>(null);
+
+  // Las columnas escondidas se recuerdan por navegador: es una preferencia de
+  // pantalla, no un dato del negocio.
+  useEffect(() => {
+    try {
+      const guardado = localStorage.getItem(CLAVE_COLS);
+      if (guardado) setOcultas(new Set(JSON.parse(guardado)));
+    } catch { /* almacenamiento bloqueado: se usan todas las columnas */ }
+  }, []);
+
+  const alternarColumna = (clave: string) => {
+    setOcultas(prev => {
+      const next = new Set(prev);
+      if (next.has(clave)) next.delete(clave); else next.add(clave);
+      try { localStorage.setItem(CLAVE_COLS, JSON.stringify([...next])); } catch { /* ignora */ }
+      return next;
+    });
+  };
+
+  // Cerrar los desplegables al pulsar fuera.
+  useEffect(() => {
+    if (!menu) return;
+    const fuera = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenu(null);
+    };
+    document.addEventListener('mousedown', fuera);
+    return () => document.removeEventListener('mousedown', fuera);
+  }, [menu]);
+
+  useEffect(() => {
+    if (!aviso) return;
+    const t = setTimeout(() => setAviso(null), 6000);
+    return () => clearTimeout(t);
+  }, [aviso]);
 
   const { data, isPending, isFetching, refetch } = useQuery({
     queryKey: ['dealer', 'operaciones'],
@@ -218,6 +289,151 @@ export default function OperacionesPage() {
   const alcance = sel === 0 ? 'de todas' : sel === 1 ? 'de 1 operación' : `de ${sel} operaciones`;
 
   const margenVisible = visibles.reduce((s, j) => s + (j.margin || 0), 0);
+  const ve = (clave: string) => !ocultas.has(clave);
+  const nCols = 2 + COLS_OPS.filter(c => ve(c.key)).length;
+
+  // Filas agrupadas por etapa, en el orden del pipeline. Cada grupo lleva su
+  // recuento y su margen, que es la pregunta real: donde esta el dinero parado.
+  const grupos = useMemo(() => {
+    if (!agrupar) return null;
+    const orden = [...STAGES.map(st => st.key), 'perdido'];
+    const mapa = new Map<string, Job[]>();
+    for (const j of visibles) {
+      const arr = mapa.get(j.stage) || [];
+      arr.push(j);
+      mapa.set(j.stage, arr);
+    }
+    return orden
+      .filter(k => mapa.has(k))
+      .map(k => ({
+        stage: k,
+        label: stageDef(k)?.label ?? k,
+        dot: stageDef(k)?.dot ?? DOT_WAIT,
+        filas: mapa.get(k)!,
+        margen: mapa.get(k)!.reduce((t, j) => t + (j.margin || 0), 0),
+      }));
+  }, [agrupar, visibles]);
+
+  /* ── Exportar: CSV del nivel que se esta viendo ── */
+  const exportar = useCallback(() => {
+    const esc = (v: unknown) => {
+      const t = v == null ? '' : String(v);
+      return /[";\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
+    };
+    let cabeceras: string[] = [];
+    let filas: unknown[][] = [];
+    let nombre = 'operaciones';
+
+    if (level === 'ops') {
+      cabeceras = ['Cliente', 'Coche', 'Etapa', 'Ahora toca', '576', 'Ficha', 'Presupuesto', 'Margen', 'Margen real', 'Entrega'];
+      filas = visibles.map(j => {
+        const t = tramitesDe.get(j.id) || { impuestos: 'none', ficha: 'none' };
+        const estado = (e: string) => (e === 'done' ? 'hecho' : e === 'work' ? 'en curso' : 'sin encargar');
+        return [
+          j.client_name, cocheDe(j), stageDef(j.stage)?.label ?? j.stage,
+          isClosed(j.stage) ? '' : (stageDef(j.stage)?.next ?? ''),
+          estado(t.impuestos), estado(t.ficha),
+          j.price ?? '', j.margin ?? '', j.margin_is_real ? 'si' : 'no', entregaText(j),
+        ];
+      });
+    } else if (level === 'impuestos') {
+      nombre = 'impuestos';
+      cabeceras = ['Coche', 'Cliente', 'Comunidad', 'Municipio', 'Provincia', 'CVF', 'Valoracion', 'CO2', '576 estimado', 'Estado'];
+      filas = impuestos.map(o => {
+        const v = o.payload as Record<string, unknown>;
+        return [
+          v.coche ?? '', o.dealer_client_requests?.client_name ?? '', v.region_label ?? '',
+          v.municipio ?? '', v.provincia ?? '', v.cvf ?? '', v.valoracion ?? '', v.co2 ?? '',
+          v.iedmt_estimado ?? '', SERVICE_STATUS_LABELS[o.status],
+        ];
+      });
+    } else {
+      nombre = 'fichas-reducidas';
+      cabeceras = ['Coche', 'Cliente', 'Fotos', 'Faltan', 'Estado', 'Documentos'];
+      filas = fichas.map(o => {
+        const v = o.payload as { coche?: string; photos?: unknown[]; faltan?: string[] };
+        return [
+          v.coche ?? '', o.dealer_client_requests?.client_name ?? '',
+          Array.isArray(v.photos) ? v.photos.length : 0,
+          Array.isArray(v.faltan) ? v.faltan.join(' · ') : '',
+          SERVICE_STATUS_LABELS[o.status],
+          (o.result?.files || []).map(f => f.label).join(' · '),
+        ];
+      });
+    }
+
+    if (filas.length === 0) {
+      setAviso({ texto: 'No hay nada que exportar en esta vista.', malo: true });
+      return;
+    }
+
+    // Punto y coma y BOM: es lo que abre Excel en español sin pelearse.
+    const csv = '\ufeff' + [cabeceras, ...filas].map(f => f.map(esc).join(';')).join('\r\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${nombre}-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setAviso({ texto: `Exportadas ${filas.length} filas.` });
+  }, [level, visibles, impuestos, fichas, tramitesDe]);
+
+  /* ── Duplicar: mismo cliente y mismas preferencias, operacion nueva ── */
+  const duplicar = useCallback(async () => {
+    const j = jobs.find(x => x.id === unaSeleccionada);
+    if (!j || !token) return;
+    setTrabajando('duplicar');
+    try {
+      const cuerpo: Record<string, unknown> = {
+        client_name: j.client_name,
+        client_phone: j.client_phone,
+        client_email: j.client_email,
+      };
+      // Si la solicitud original tenia varios coches, se copian todos; si no,
+      // los campos planos de siempre.
+      if (Array.isArray(j.vehicles) && j.vehicles.length) cuerpo.vehicles = j.vehicles;
+      else Object.assign(cuerpo, { make: j.make, model: j.model, max_price: j.max_price });
+
+      const res = await fetch('/api/dealer/clients', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(cuerpo),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.id) throw new Error(data.error || 'No se pudo duplicar');
+      await queryClient.invalidateQueries({ queryKey: ['dealer', 'operaciones'] });
+      setSelected(new Set());
+      router.push(`/dealer/clientes/${data.id}`);
+    } catch (e) {
+      setAviso({ texto: e instanceof Error ? e.message : 'No se pudo duplicar', malo: true });
+    } finally {
+      setTrabajando(null);
+    }
+  }, [jobs, unaSeleccionada, token, queryClient, router]);
+
+  /* ── Eliminar: a la papelera, nunca borrado definitivo desde aqui ── */
+  const eliminar = useCallback(async () => {
+    if (!token || sel === 0) return;
+    setConfirmarBorrado(false);
+    setTrabajando('eliminar');
+    const ids = [...selected];
+    let hechas = 0;
+    for (const id of ids) {
+      const res = await fetch(`/api/dealer/clients/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) hechas++;
+    }
+    await queryClient.invalidateQueries({ queryKey: ['dealer', 'operaciones'] });
+    setSelected(new Set());
+    setTrabajando(null);
+    setAviso(
+      hechas === ids.length
+        ? { texto: `${hechas} ${hechas === 1 ? 'operación movida' : 'operaciones movidas'} a la papelera.` }
+        : { texto: `Solo se movieron ${hechas} de ${ids.length}.`, malo: true },
+    );
+  }, [token, sel, selected, queryClient]);
 
   return (
     <div className="-mx-4 sm:-mx-5 md:-mx-6 -mt-16 md:-mt-8">
@@ -332,9 +548,17 @@ export default function OperacionesPage() {
         <Link href="/dealer/analizar" className="d-btn-primary inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12.5px] font-semibold">
           <Plus className="w-3.5 h-3.5" /> Crear
         </Link>
-        <button disabled className="d-btn-ghost px-3 py-1.5 rounded-lg text-[12.5px] disabled:opacity-40 inline-flex items-center gap-1.5">
-          <Copy className="w-3.5 h-3.5" /> Duplicar
+
+        <button
+          onClick={duplicar}
+          disabled={!unaSeleccionada || trabajando !== null}
+          title={sel > 1 ? 'Duplica de una en una' : 'Copia cliente y preferencias en una operación nueva'}
+          className="d-btn-ghost px-3 py-1.5 rounded-lg text-[12.5px] disabled:opacity-40 inline-flex items-center gap-1.5"
+        >
+          {trabajando === 'duplicar' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Copy className="w-3.5 h-3.5" />}
+          Duplicar
         </button>
+
         {unaSeleccionada ? (
           <Link href={`/dealer/clientes/${unaSeleccionada}`} className="d-btn-ghost px-3 py-1.5 rounded-lg text-[12.5px] inline-flex items-center gap-1.5">
             <Pencil className="w-3.5 h-3.5" /> Abrir
@@ -344,13 +568,22 @@ export default function OperacionesPage() {
             <Pencil className="w-3.5 h-3.5" /> Abrir
           </button>
         )}
-        <button disabled className="d-btn-ghost p-2 rounded-lg disabled:opacity-40" aria-label="Eliminar">
-          <Trash2 className="w-3.5 h-3.5" />
+
+        <button
+          onClick={() => setConfirmarBorrado(true)}
+          disabled={sel === 0 || trabajando !== null}
+          title={sel === 0 ? 'Marca alguna operación' : `Mover ${sel} a la papelera`}
+          className="d-btn-ghost p-2 rounded-lg disabled:opacity-40"
+          aria-label="Mover a la papelera"
+        >
+          {trabajando === 'eliminar' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
         </button>
+
         <span className="w-px h-5 bg-d-border mx-1" />
+
         {unaSeleccionada ? (
           <Link
-            href={`/dealer/clientes/${unaSeleccionada}#step-tramites`}
+            href={`/dealer/clientes/${unaSeleccionada}`}
             className="d-btn-ghost px-3 py-1.5 rounded-lg text-[12.5px] inline-flex items-center gap-1.5"
           >
             <Stamp className="w-3.5 h-3.5" /> Encargar trámites
@@ -364,18 +597,105 @@ export default function OperacionesPage() {
             <Stamp className="w-3.5 h-3.5" /> Encargar trámites
           </button>
         )}
-        <div className="ml-auto flex items-center gap-1.5">
-          <button disabled className="d-btn-ghost px-3 py-1.5 rounded-lg text-[12.5px] disabled:opacity-40 inline-flex items-center gap-1.5">
-            <Columns3 className="w-3.5 h-3.5" /> Columnas
-          </button>
-          <button disabled className="d-btn-ghost px-3 py-1.5 rounded-lg text-[12.5px] disabled:opacity-40 inline-flex items-center gap-1.5">
-            <SlidersHorizontal className="w-3.5 h-3.5" /> Desglose
-          </button>
-          <button disabled className="d-btn-ghost p-2 rounded-lg disabled:opacity-40" aria-label="Exportar">
+
+        <div className="ml-auto flex items-center gap-1.5" ref={menuRef}>
+          {/* Columnas — solo tiene sentido en el nivel de operaciones, que es
+              el unico con tabla ancha configurable. */}
+          <div className="relative">
+            <button
+              onClick={() => setMenu(m => (m === 'columnas' ? null : 'columnas'))}
+              disabled={level !== 'ops'}
+              className="d-btn-ghost px-3 py-1.5 rounded-lg text-[12.5px] disabled:opacity-40 inline-flex items-center gap-1.5"
+            >
+              <Columns3 className="w-3.5 h-3.5" /> Columnas
+              {ocultas.size > 0 && <span className="d-num text-d-dim">−{ocultas.size}</span>}
+            </button>
+            {menu === 'columnas' && (
+              <div className="absolute right-0 top-full mt-1 z-30 d-card p-1.5 min-w-[190px]">
+                {COLS_OPS.map(c => (
+                  <button
+                    key={c.key}
+                    onClick={() => alternarColumna(c.key)}
+                    className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-[13px] text-d-text-2 hover:bg-d-surface-2 text-left"
+                  >
+                    <span className={`w-4 h-4 rounded grid place-items-center border ${ve(c.key) ? 'bg-d-accent border-d-accent text-white' : 'border-d-border'}`}>
+                      {ve(c.key) && <Check className="w-3 h-3" />}
+                    </span>
+                    {c.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Desglose — agrupa por etapa con subtotal de margen. */}
+          <div className="relative">
+            <button
+              onClick={() => setMenu(m => (m === 'desglose' ? null : 'desglose'))}
+              disabled={level !== 'ops'}
+              className={`d-btn-ghost px-3 py-1.5 rounded-lg text-[12.5px] disabled:opacity-40 inline-flex items-center gap-1.5 ${agrupar ? 'text-d-accent' : ''}`}
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5" /> Desglose
+            </button>
+            {menu === 'desglose' && (
+              <div className="absolute right-0 top-full mt-1 z-30 d-card p-1.5 min-w-[190px]">
+                {([[false, 'Sin desglose'], [true, 'Por etapa']] as const).map(([valor, etiqueta]) => (
+                  <button
+                    key={String(valor)}
+                    onClick={() => { setAgrupar(valor); setMenu(null); }}
+                    className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-[13px] text-d-text-2 hover:bg-d-surface-2 text-left"
+                  >
+                    <span className="w-4 h-4 grid place-items-center">
+                      {agrupar === valor && <Check className="w-3.5 h-3.5 text-d-accent" />}
+                    </span>
+                    {etiqueta}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <button
+            onClick={exportar}
+            className="d-btn-ghost p-2 rounded-lg"
+            aria-label="Exportar a CSV"
+            title="Exportar a CSV lo que ves"
+          >
             <Download className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
+
+      {aviso && (
+        <div className={`px-4 sm:px-6 py-2 text-[13px] flex items-center gap-2 border-b border-d-border ${aviso.malo ? 'text-d-red bg-d-red/5' : 'text-d-green bg-d-green/5'}`}>
+          {aviso.malo ? <AlertTriangle className="w-4 h-4 shrink-0" /> : <Check className="w-4 h-4 shrink-0" />}
+          {aviso.texto}
+          <button onClick={() => setAviso(null)} className="ml-auto text-d-dim hover:text-d-text" aria-label="Cerrar aviso">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
+      {confirmarBorrado && (
+        <div className="fixed inset-0 z-50 bg-black/40 grid place-items-center p-4" onClick={() => setConfirmarBorrado(false)}>
+          <div className="d-card max-w-md w-full p-5" onClick={e => e.stopPropagation()}>
+            <h2 className="text-d-text font-semibold text-[15px]">
+              ¿Mover {sel} {sel === 1 ? 'operación' : 'operaciones'} a la papelera?
+            </h2>
+            <p className="text-d-dim text-[13px] mt-1.5">
+              No se borra nada: siguen en la Papelera y puedes restaurarlas cuando quieras.
+            </p>
+            <div className="flex gap-2 justify-end mt-4">
+              <button onClick={() => setConfirmarBorrado(false)} className="d-btn-ghost px-3 py-1.5 rounded-lg text-[13px]">
+                Cancelar
+              </button>
+              <button onClick={eliminar} className="d-btn-primary px-3 py-1.5 rounded-lg text-[13px] font-semibold">
+                Mover a la papelera
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Tabla ── */}
       {loading ? (
@@ -391,7 +711,7 @@ export default function OperacionesPage() {
       ) : (
         <div className="overflow-x-auto">
           {level === 'ops' && (
-            <table className="d-table min-w-[1000px]">
+            <table className="d-table w-full min-w-[720px]">
               <thead>
                 <tr>
                   <th className="w-9 pr-0">
@@ -404,70 +724,97 @@ export default function OperacionesPage() {
                     />
                   </th>
                   <th>Operación</th>
-                  <th>Etapa</th>
-                  <th>Ahora toca</th>
-                  <th>Trámites</th>
-                  <th className="r">Presupuesto</th>
-                  <th className="r">Margen</th>
-                  <th>Entrega</th>
+                  {ve('etapa') && <th>Etapa</th>}
+                  {ve('ahora') && <th>Ahora toca</th>}
+                  {ve('tramites') && <th>Trámites</th>}
+                  {ve('presupuesto') && <th className="r">Presupuesto</th>}
+                  {ve('margen') && <th className="r">Margen</th>}
+                  {ve('entrega') && <th>Entrega</th>}
                 </tr>
               </thead>
               <tbody>
-                {visibles.map(j => {
-                  const def = stageDef(j.stage);
-                  const marcada = selected.has(j.id);
-                  const t = tramitesDe.get(j.id) || { impuestos: 'none' as TramiteState, ficha: 'none' as TramiteState };
-                  const dot = def?.dot || DOT_WAIT;
-                  const esperando = dot === DOT_MOVING || dot === DOT_WAIT;
-                  return (
-                    <tr key={j.id} className={marcada ? 'bg-d-accent/[0.07]' : undefined}>
-                      <td className="pr-0">
-                        <input
-                          type="checkbox"
-                          checked={marcada}
-                          onChange={() => toggle(j.id)}
-                          aria-label={`Seleccionar ${j.client_name}`}
-                          className="w-[15px] h-[15px] accent-[#2b5bd7] align-middle"
-                        />
-                      </td>
-                      <td className="min-w-[220px]">
-                        <Link href={`/dealer/clientes/${j.id}`} className="font-semibold text-d-text hover:text-d-accent">
-                          {j.client_name}
-                        </Link>
-                        <div className="text-d-dim text-[11.5px] mt-0.5 truncate max-w-[280px]">{cocheDe(j)}</div>
-                      </td>
-                      <td>
-                        <span className="inline-flex items-center gap-2 whitespace-nowrap">
-                          <Dot color={dot} /> {def?.label || j.stage}
-                        </span>
-                      </td>
-                      <td className={`text-[12.5px] ${dot === DOT_ACTION ? 'text-d-amber font-medium' : 'text-d-dim'}`}>
-                        {isClosed(j.stage) ? '—' : (esperando ? def?.next?.toLowerCase() : def?.next) || '—'}
-                      </td>
-                      <td>
-                        <span className="inline-flex gap-1">
-                          <TramiteChip label={TR_LABEL.impuestos} state={t.impuestos} />
-                          <TramiteChip label={TR_LABEL.ficha_reducida} state={t.ficha} />
-                        </span>
-                      </td>
-                      <td className="r d-num">{eur(j.price)}</td>
-                      <td className={`r d-num font-semibold ${j.margin == null ? 'text-d-dim' : j.margin >= 0 ? 'text-d-green' : 'text-d-red'}`}>
-                        {j.margin == null ? '—' : `${j.margin >= 0 ? '+' : ''}${eur(j.margin)}`}
-                        {j.margin_is_real && <span className="text-d-dim text-[10px] ml-1 font-normal">real</span>}
-                      </td>
-                      <td className="text-d-dim text-[12.5px]">{entregaText(j)}</td>
-                    </tr>
-                  );
-                })}
+                {(grupos ?? [{ stage: '', label: '', dot: '', filas: visibles, margen: 0 }]).map(g => (
+                  <Fragment key={g.stage || 'todas'}>
+                    {grupos && (
+                      <tr className="bg-d-surface-2">
+                        <td colSpan={nCols} className="py-2">
+                          <span className="inline-flex items-center gap-2 text-[12.5px] font-semibold text-d-text">
+                            <Dot color={g.dot} /> {g.label}
+                            <span className="d-num text-d-dim font-normal">{g.filas.length}</span>
+                          </span>
+                          {g.margen !== 0 && (
+                            <span className="d-num text-d-dim text-[12.5px] ml-3">
+                              margen {eur(g.margen)}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    )}
+                    {g.filas.map(j => {
+                      const def = stageDef(j.stage);
+                      const marcada = selected.has(j.id);
+                      const t = tramitesDe.get(j.id) || { impuestos: 'none' as TramiteState, ficha: 'none' as TramiteState };
+                      const dot = def?.dot || DOT_WAIT;
+                      const esperando = dot === DOT_MOVING || dot === DOT_WAIT;
+                      return (
+                        <tr key={j.id} className={marcada ? 'bg-d-accent/[0.07]' : undefined}>
+                          <td className="pr-0">
+                            <input
+                              type="checkbox"
+                              checked={marcada}
+                              onChange={() => toggle(j.id)}
+                              aria-label={`Seleccionar ${j.client_name}`}
+                              className="w-[15px] h-[15px] accent-[#2b5bd7] align-middle"
+                            />
+                          </td>
+                          <td className="min-w-[200px]">
+                            <Link href={`/dealer/clientes/${j.id}`} className="font-semibold text-d-text hover:text-d-accent">
+                              {j.client_name}
+                            </Link>
+                            <div className="text-d-dim text-[11.5px] mt-0.5 truncate max-w-[280px]">{cocheDe(j)}</div>
+                          </td>
+                          {ve('etapa') && (
+                            <td>
+                              <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                                <Dot color={dot} /> {def?.label || j.stage}
+                              </span>
+                            </td>
+                          )}
+                          {ve('ahora') && (
+                            <td className={`text-[12.5px] ${dot === DOT_ACTION ? 'text-d-amber font-medium' : 'text-d-dim'}`}>
+                              {isClosed(j.stage) ? '—' : (esperando ? def?.next?.toLowerCase() : def?.next) || '—'}
+                            </td>
+                          )}
+                          {ve('tramites') && (
+                            <td>
+                              <span className="inline-flex gap-1">
+                                <TramiteChip label={TR_LABEL.impuestos} state={t.impuestos} />
+                                <TramiteChip label={TR_LABEL.ficha_reducida} state={t.ficha} />
+                              </span>
+                            </td>
+                          )}
+                          {ve('presupuesto') && <td className="r d-num">{eur(j.price)}</td>}
+                          {ve('margen') && (
+                            <td className={`r d-num font-semibold ${j.margin == null ? 'text-d-dim' : j.margin >= 0 ? 'text-d-green' : 'text-d-red'}`}>
+                              {j.margin == null ? '—' : `${j.margin >= 0 ? '+' : ''}${eur(j.margin)}`}
+                              {j.margin_is_real && <span className="text-d-dim text-[10px] ml-1 font-normal">real</span>}
+                            </td>
+                          )}
+                          {ve('entrega') && <td className="text-d-dim text-[12.5px]">{entregaText(j)}</td>}
+                        </tr>
+                      );
+                    })}
+                  </Fragment>
+                ))}
                 {visibles.length === 0 && (
-                  <tr><td colSpan={8} className="text-center text-d-dim py-10">
+                  <tr><td colSpan={nCols} className="text-center text-d-dim py-10">
                     Ninguna operación en esta vista{busca ? ' con esa búsqueda' : ''}.
                   </td></tr>
                 )}
               </tbody>
               <tfoot>
                 <tr>
-                  <td colSpan={8} className="bg-d-surface-2 text-d-muted text-[12.5px]">
+                  <td colSpan={nCols} className="bg-d-surface-2 text-d-muted text-[12.5px]">
                     Resultados de <b className="d-num text-d-text">{visibles.length}</b>{' '}
                     {visibles.length === 1 ? 'operación' : 'operaciones'} ·
                     margen <span className="d-num text-d-text">{eur(margenVisible)}</span> ·
