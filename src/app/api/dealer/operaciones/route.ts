@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
     const [reqRes, eventsRes] = await Promise.all([
       supabase
         .from('dealer_client_requests')
-        .select(`id, client_name, stage, make, model, max_price, max_km, min_year, fuel, transmission, mobile_url, vehicles, created_at, updated_at, agreed_price, actual_purchase, runner_expenses, transit_progress, delivery_eta,
+        .select(`id, client_name, client_phone, client_email, stage, make, model, max_price, max_km, min_year, fuel, transmission, mobile_url, vehicles, created_at, updated_at, agreed_price, actual_purchase, runner_expenses, transit_progress, delivery_eta,
                  dealer_leads ( id, is_shortlisted, created_at, deleted_at, car_analyses ( title, car_image_url ), dealer_presupuestos ( selling_price, margin, created_at ) )`)
         .eq('dealer_id', dealerId)
         .is('deleted_at', null)
@@ -70,6 +70,10 @@ export async function GET(request: NextRequest) {
       return {
         id: j.id,
         client_name: j.client_name,
+        // Contacto: lo necesita "Duplicar" en la consola para arrastrar al
+        // mismo cliente a la operacion nueva (y deduplicar por telefono).
+        client_phone: j.client_phone ?? null,
+        client_email: j.client_email ?? null,
         stage: j.stage || 'solicitud',
         make: j.make, model: j.model, max_price: j.max_price, max_km: j.max_km,
         min_year: j.min_year, fuel: j.fuel, transmission: j.transmission,

@@ -65,14 +65,25 @@ function LoginForm() {
     // Se vuelve a ESTA página con el `redirect` intacto: así el destino
     // sobrevive al viaje a Google.
     const back = `${window.location.origin}/login?redirect=${encodeURIComponent(redirect)}`;
-    const { error: err } = await supabase.auth.signInWithOAuth({
+
+    // La redireccion se hace A MANO (skipBrowserRedirect) porque supabase-js
+    // 2.116 manda el navegador a /auth/v1/authorize SIN la apikey, y el servidor
+    // la exige: "No API key found in request". Se anade aqui. Es la clave
+    // anonima, que ya viaja en el bundle del navegador — no hay nada que ocultar.
+    const { data, error: err } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: back },
+      options: { redirectTo: back, skipBrowserRedirect: true },
     });
-    if (err) {
-      setError(err.message || 'No se pudo abrir Google');
+    if (err || !data?.url) {
+      setError(err?.message || 'No se pudo abrir Google');
       setBusy(false);
+      return;
     }
+    const destino = new URL(data.url);
+    if (!destino.searchParams.has('apikey')) {
+      destino.searchParams.set('apikey', process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '');
+    }
+    window.location.assign(destino.toString());
   };
 
   const submit = async (e: React.FormEvent) => {
