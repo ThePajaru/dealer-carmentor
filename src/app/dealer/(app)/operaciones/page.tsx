@@ -871,7 +871,7 @@ export default function OperacionesPage() {
                       return (
                         <tr
                           key={j.id}
-                          className={marcada ? 'bg-d-accent/[0.07]' : franja ? 'bg-[#edf1f8]' : undefined}
+                          className={marcada ? 'bg-d-accent/[0.07]' : franja ? 'bg-[#e7edf7]' : 'bg-[#f8fafd]'}
                         >
                           <td className="pr-0">
                             <input
@@ -983,7 +983,7 @@ export default function OperacionesPage() {
                   };
                   const files = o.result?.files || [];
                   return (
-                    <tr key={o.id} className={fila % 2 === 1 ? 'bg-[#edf1f8]' : undefined}>
+                    <tr key={o.id} className={fila % 2 === 1 ? 'bg-[#e7edf7]' : 'bg-[#f8fafd]'}>
                       <td className="min-w-[220px]">
                         <Link href={`/dealer/clientes/${o.request_id}`} className="font-semibold text-d-text hover:text-d-accent">
                           {p.coche || 'Vehículo'}
@@ -1059,7 +1059,7 @@ export default function OperacionesPage() {
                   const pct = total > 0 ? Math.round((hechas / total) * 100) : 0;
                   const files = o.result?.files || [];
                   return (
-                    <tr key={o.id} className={fila % 2 === 1 ? 'bg-[#edf1f8]' : undefined}>
+                    <tr key={o.id} className={fila % 2 === 1 ? 'bg-[#e7edf7]' : 'bg-[#f8fafd]'}>
                       <td className="min-w-[220px]">
                         <Link href={`/dealer/clientes/${o.request_id}`} className="font-semibold text-d-text hover:text-d-accent">
                           {p.coche || 'Vehículo'}
