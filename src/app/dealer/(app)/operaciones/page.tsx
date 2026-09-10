@@ -601,8 +601,11 @@ export default function OperacionesPage() {
         )}
 
         <div className="ml-auto flex items-center gap-1.5" ref={menuRef}>
-          {/* Columnas — solo tiene sentido en el nivel de operaciones, que es
-              el unico con tabla ancha configurable. */}
+          {/* Columnas y Desglose solo existen en el nivel de operaciones: en
+              Impuestos y Ficha no hay nada que configurar, y un boton apagado
+              que nunca se enciende parece roto. Exportar si vale en los tres. */}
+          {level === 'ops' && (
+          <>
           <div className="relative">
             <button
               onClick={() => setMenu(m => (m === 'columnas' ? null : 'columnas'))}
@@ -656,6 +659,9 @@ export default function OperacionesPage() {
               </div>
             )}
           </div>
+
+          </>
+          )}
 
           <button
             onClick={exportar}
@@ -725,8 +731,8 @@ export default function OperacionesPage() {
                       className="w-[15px] h-[15px] accent-[#2b5bd7] align-middle"
                     />
                   </th>
-                  <th>Operación</th>
-                  {ve('etapa') && <th>Etapa</th>}
+                  <th className="w-full">Operación</th>
+                  {ve('etapa') && <th className="whitespace-nowrap">Etapa</th>}
                   {ve('ahora') && <th>Ahora toca</th>}
                   {ve('tramites') && <th>Trámites</th>}
                   {ve('presupuesto') && <th className="r">Presupuesto</th>}
@@ -827,11 +833,14 @@ export default function OperacionesPage() {
             </table>
           )}
 
+          {/* w-full en la primera columna de cada nivel: se queda el hueco
+              sobrante y las numericas se ajustan a su contenido, en vez de
+              repartirse el ancho y dejar medio metro entre CVF y VALORACION. */}
           {level === 'impuestos' && (
-            <table className="d-table min-w-[980px]">
+            <table className="d-table w-full min-w-[860px]">
               <thead>
                 <tr>
-                  <th>Coche</th>
+                  <th className="w-full">Coche</th>
                   <th>Comunidad</th>
                   <th>Municipio</th>
                   <th className="r">CVF</th>
@@ -864,10 +873,10 @@ export default function OperacionesPage() {
                         {p.municipio || '—'}
                         {p.provincia && p.provincia !== p.municipio ? ` · ${p.provincia}` : ''}
                       </td>
-                      <td className="r d-num">{p.cvf ?? '—'}</td>
-                      <td className="r d-num">{eur(p.valoracion)}</td>
-                      <td className="r d-num">{p.co2 != null ? `${p.co2} g/km` : 'sin acreditar'}</td>
-                      <td className="r d-num font-semibold text-d-text">{eur(p.iedmt_estimado)}</td>
+                      <td className="r d-num whitespace-nowrap">{p.cvf != null ? p.cvf.toLocaleString('es-ES') : '—'}</td>
+                      <td className="r d-num whitespace-nowrap">{eur(p.valoracion)}</td>
+                      <td className="r d-num whitespace-nowrap">{p.co2 != null ? `${p.co2} g/km` : 'sin acreditar'}</td>
+                      <td className="r d-num whitespace-nowrap font-semibold text-d-text">{eur(p.iedmt_estimado)}</td>
                       <td><StatusPill status={o.status} /></td>
                       <td>
                         {files.length === 0 ? <span className="text-d-dim">—</span> : (
@@ -894,7 +903,8 @@ export default function OperacionesPage() {
               {impuestos.length > 0 && (
                 <tfoot>
                   <tr><td colSpan={9} className="bg-d-surface-2 text-d-muted text-[12.5px]">
-                    <b className="d-num text-d-text">{impuestos.length}</b> coches ·
+                    <b className="d-num text-d-text">{impuestos.length}</b>{' '}
+                    {impuestos.length === 1 ? 'coche' : 'coches'} ·
                     576 estimado{' '}
                     <span className="d-num text-d-text">
                       {eur(impuestos.reduce((s, o) => s + Number((o.payload as { iedmt_estimado?: number }).iedmt_estimado || 0), 0))}
@@ -907,10 +917,10 @@ export default function OperacionesPage() {
           )}
 
           {level === 'ficha' && (
-            <table className="d-table min-w-[820px]">
+            <table className="d-table w-full min-w-[680px]">
               <thead>
                 <tr>
-                  <th>Coche</th>
+                  <th className="w-full">Coche</th>
                   <th>Expediente de fotos</th>
                   <th>Estado</th>
                   <th>Ficha firmada</th>
@@ -974,8 +984,10 @@ export default function OperacionesPage() {
               {fichas.length > 0 && (
                 <tfoot>
                   <tr><td colSpan={4} className="bg-d-surface-2 text-d-muted text-[12.5px]">
-                    <b className="d-num text-d-text">{fichas.length}</b> coches ·
-                    <span className="d-num"> {fichas.filter(o => o.status === 'completado').length}</span> fichas firmadas
+                    <b className="d-num text-d-text">{fichas.length}</b>{' '}
+                    {fichas.length === 1 ? 'coche' : 'coches'} ·
+                    <span className="d-num"> {fichas.filter(o => o.status === 'completado').length}</span>{' '}
+                    {fichas.filter(o => o.status === 'completado').length === 1 ? 'ficha firmada' : 'fichas firmadas'}
                     <span className="text-d-dim"> · las fotos salen de la inspección del runner, no hay una segunda visita al coche</span>
                   </td></tr>
                 </tfoot>
