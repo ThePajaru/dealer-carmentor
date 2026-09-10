@@ -717,6 +717,7 @@ export default function OperacionesPage() {
           </p>
         </div>
       ) : (
+        <>
         <div className="overflow-x-auto min-h-[420px]">
           {/* min-h: con una o dos filas la tabla se quedaba flotando sobre medio
               metro de blanco y la pantalla parecia a medio cargar. */}
@@ -904,7 +905,7 @@ export default function OperacionesPage() {
               </tbody>
               {impuestos.length > 0 && (
                 <tfoot>
-                  <tr><td colSpan={9} className="bg-d-surface-2 text-d-muted text-[12.5px]">
+                  <tr><td colSpan={9} className="bg-d-surface-2 text-d-muted text-[12.5px] text-center py-3">
                     <b className="d-num text-d-text">{impuestos.length}</b>{' '}
                     {impuestos.length === 1 ? 'coche' : 'coches'} ·
                     576 estimado{' '}
@@ -985,7 +986,7 @@ export default function OperacionesPage() {
               </tbody>
               {fichas.length > 0 && (
                 <tfoot>
-                  <tr><td colSpan={4} className="bg-d-surface-2 text-d-muted text-[12.5px]">
+                  <tr><td colSpan={4} className="bg-d-surface-2 text-d-muted text-[12.5px] text-center py-3">
                     <b className="d-num text-d-text">{fichas.length}</b>{' '}
                     {fichas.length === 1 ? 'coche' : 'coches'} ·
                     <span className="d-num"> {fichas.filter(o => o.status === 'completado').length}</span>{' '}
@@ -997,16 +998,18 @@ export default function OperacionesPage() {
             </table>
           )}
 
-          {/* Con la tabla casi vacia, decir que va a aparecer ahi es mejor que
-              dejar el hueco mudo. Desaparece en cuanto hay trabajo de verdad. */}
-          {level !== 'ops' && (level === 'impuestos' ? impuestos.length : fichas.length) < 3 && (
-            <p className="px-4 sm:px-6 py-5 text-d-dim text-[13px]">
-              {level === 'impuestos'
-                ? 'Aquí van apareciendo los impuestos de cada coche según los encargas desde su operación: el 576 y el IVTM, con sus justificantes cuando el gestor los presenta.'
-                : 'Aquí van apareciendo las fichas técnicas reducidas que encargas desde cada operación, con el estado del expediente de fotos y el PDF firmado por el ingeniero.'}
-            </p>
-          )}
         </div>
+        {/* Fuera del contenedor con scroll: dentro se encogia al ancho visible
+            mientras la tabla se desplazaba. Con la tabla casi vacia, decir que
+            va a aparecer ahi es mejor que dejar el hueco mudo. */}
+        {level !== 'ops' && (level === 'impuestos' ? impuestos.length : fichas.length) < 3 && (
+          <p className="px-6 py-10 text-d-dim text-[13px] text-center max-w-[62ch] mx-auto leading-relaxed">
+            {level === 'impuestos'
+              ? 'Aquí van apareciendo los impuestos de cada coche según los encargas desde su operación: el 576 y el IVTM, con sus justificantes cuando el gestor los presenta.'
+              : 'Aquí van apareciendo las fichas técnicas reducidas que encargas desde cada operación, con el estado del expediente de fotos y el PDF firmado por el ingeniero.'}
+          </p>
+        )}
+        </>
       )}
     </div>
   );
