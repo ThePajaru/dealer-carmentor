@@ -43,6 +43,11 @@ interface SourcingState {
 
 const PREVIEW_COUNT = 4;
 
+// Boton + veredicto de una fila de motor. En movil el envoltorio no existe
+// (`contents`): sus hijos son celdas de la rejilla de la fila. Desde sm van
+// juntos y a la derecha, asi que si la fila salta de linea saltan los dos.
+const ACTIONS_CLS = 'contents sm:flex sm:items-center sm:gap-3 sm:ml-auto sm:shrink-0';
+
 const RELIABILITY_TAG: Record<'rec' | 'warn' | 'bad', { label: string; cls: string; Icon: typeof CheckCircle2 }> = {
   rec: { label: 'Recomendado', cls: 'd-tag-good', Icon: CheckCircle2 },
   warn: { label: 'Con reservas', cls: 'd-tag-warn', Icon: AlertTriangle },
@@ -186,6 +191,19 @@ export default function ModelSearch({
   const engineMeta = (e: Engine) =>
     [e.power_cv ? `${e.power_cv} CV` : null, e.fuel ? FUEL_LABEL[e.fuel] || e.fuel : null].filter(Boolean).join(' · ');
 
+  // En movil la potencia baja a su propia linea: pegada al nombre partia
+  // "(EA211 evo) · 150 CV" por cualquier sitio.
+  const engineTitle = (e: Engine) => (
+    <>
+      {e.name}
+      {engineMeta(e) && (
+        <span className="block sm:inline text-d-dim font-normal max-sm:text-xs">
+          <span className="hidden sm:inline"> · </span>{engineMeta(e)}
+        </span>
+      )}
+    </>
+  );
+
   const renderListings = (engine: Engine) => {
     const st = sourcing[engineKey(engine)];
     if (!st) return null;
@@ -245,13 +263,16 @@ export default function ModelSearch({
     );
   };
 
+  // En movil el boton va en su propia fila y a todo el ancho (col-span-full +
+  // order-last dentro de la rejilla de la fila): al lado del texto, este se
+  // quedaba en una columna de 80px con una palabra por linea.
   const sourceButton = (engine: Engine, primary: boolean) => {
     const st = sourcing[engineKey(engine)];
     if (st?.loading || st?.listings) return null;
     return (
       <button
         onClick={() => sourceEngine(engine)}
-        className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-colors ${
+        className={`col-span-full order-last sm:order-none shrink-0 inline-flex items-center justify-center gap-1.5 px-3 py-2.5 sm:py-1.5 rounded-lg text-xs sm:text-[11px] font-semibold transition-colors ${
           primary ? 'd-btn-primary' : 'text-d-text-2 border border-d-border hover:bg-d-surface-2 hover:text-d-text'
         }`}
       >
@@ -263,18 +284,20 @@ export default function ModelSearch({
   return (
     <section className="py-4 border-t border-d-border first:border-t-0 first:pt-0">
       {/* Model header — no box, just a row + a hairline under it */}
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-2.5 min-w-0">
+      {/* En movil todo cabe en una fila: el titulo trunca y «Orientativo» se
+          funde en el subtitulo en vez de empujar Ajustes y mobile.de abajo. */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5 min-w-0 flex-1">
           <span className="d-ic w-8 h-8 shrink-0"><Gauge className="w-4 h-4" /></span>
           <div className="min-w-0">
             <h4 className="text-d-text text-[15px] font-semibold truncate leading-tight">{make} {model}</h4>
-            <p className="text-d-dim text-[11px]">Motorización recomendada</p>
+            <p className="text-d-dim text-[11px] truncate"><span className="sm:hidden">Recomendación orientativa</span><span className="hidden sm:inline">Motorización recomendada</span></p>
           </div>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-1 sm:gap-2 shrink-0">
           <button
             onClick={() => setShowFilters(s => !s)}
-            className={`inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-md transition-colors ${showFilters ? 'bg-d-accent/10 text-d-accent' : 'text-d-dim hover:text-d-text'}`}
+            className={`inline-flex items-center gap-1 text-[11px] px-2 py-1.5 sm:py-1 rounded-md transition-colors ${showFilters ? 'bg-d-accent/10 text-d-accent' : 'text-d-dim hover:text-d-text'}`}
           >
             <SlidersHorizontal className="w-3 h-3" /> Ajustes
           </button>
@@ -282,12 +305,12 @@ export default function ModelSearch({
             <a
               href={vehicle.mobile_url} target="_blank" rel="noopener"
               title={`Abrir la búsqueda general en mobile.de · ${make} ${model}`}
-              className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-md text-d-dim hover:text-d-accent transition-colors"
+              className="inline-flex items-center gap-1 text-[11px] px-2 py-1.5 sm:py-1 rounded-md text-d-dim hover:text-d-accent transition-colors"
             >
               mobile.de <ExternalLink className="w-3 h-3" />
             </a>
           )}
-          <span className="d-tag d-tag-muted">Orientativo</span>
+          <span className="hidden sm:inline-flex"><span className="d-tag d-tag-muted">Orientativo</span></span>
         </div>
       </div>
 
@@ -296,23 +319,23 @@ export default function ModelSearch({
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
             <label className="block">
               <span className="block text-[10px] text-d-dim mb-0.5">Precio máx (€)</span>
-              <input type="number" inputMode="numeric" value={fMaxPrice} onChange={e => setFMaxPrice(e.target.value)} className="d-input d-num w-full px-2 py-1.5 text-xs" />
+              <input type="number" inputMode="numeric" value={fMaxPrice} onChange={e => setFMaxPrice(e.target.value)} className="d-input d-num w-full px-2 py-1.5 text-base sm:text-xs" />
             </label>
             <label className="block">
               <span className="block text-[10px] text-d-dim mb-0.5">Km máx</span>
-              <input type="number" inputMode="numeric" value={fMaxKm} onChange={e => setFMaxKm(e.target.value)} className="d-input d-num w-full px-2 py-1.5 text-xs" />
+              <input type="number" inputMode="numeric" value={fMaxKm} onChange={e => setFMaxKm(e.target.value)} className="d-input d-num w-full px-2 py-1.5 text-base sm:text-xs" />
             </label>
             <label className="block">
               <span className="block text-[10px] text-d-dim mb-0.5">Año mín</span>
-              <input type="number" inputMode="numeric" value={fMinYear} onChange={e => setFMinYear(e.target.value)} className="d-input d-num w-full px-2 py-1.5 text-xs" />
+              <input type="number" inputMode="numeric" value={fMinYear} onChange={e => setFMinYear(e.target.value)} className="d-input d-num w-full px-2 py-1.5 text-base sm:text-xs" />
             </label>
             <label className="block">
               <span className="block text-[10px] text-d-dim mb-0.5">Año máx</span>
-              <input type="number" inputMode="numeric" value={fMaxYear} onChange={e => setFMaxYear(e.target.value)} placeholder="fin de la generación" className="d-input d-num w-full px-2 py-1.5 text-xs" />
+              <input type="number" inputMode="numeric" value={fMaxYear} onChange={e => setFMaxYear(e.target.value)} placeholder="fin de gen." className="d-input d-num w-full px-2 py-1.5 text-base sm:text-xs" />
             </label>
-            <label className="block">
+            <label className="block col-span-2 sm:col-span-1">
               <span className="block text-[10px] text-d-dim mb-0.5">Cambio</span>
-              <select value={fTrans} onChange={e => setFTrans(e.target.value)} className="d-input w-full px-2 py-1.5 text-xs">
+              <select value={fTrans} onChange={e => setFTrans(e.target.value)} className="d-input w-full px-2 py-1.5 text-base sm:text-xs">
                 <option value="">Cualquiera</option>
                 <option value="AUTOMATIC_GEAR">Automático</option>
                 <option value="MANUAL_GEAR">Manual</option>
@@ -321,7 +344,7 @@ export default function ModelSearch({
           </div>
           <label className="block">
             <span className="block text-[10px] text-d-dim mb-0.5">Versión / acabado</span>
-            <input value={fVariant} onChange={e => setFVariant(e.target.value)} placeholder="p. ej. GTI, R-Line, AMG…" className="d-input w-full px-2 py-1.5 text-xs" />
+            <input value={fVariant} onChange={e => setFVariant(e.target.value)} placeholder="p. ej. GTI, R-Line, AMG…" className="d-input w-full px-2 py-1.5 text-base sm:text-xs" />
           </label>
           <div className="flex flex-wrap gap-x-4 gap-y-2">
             <label className="inline-flex items-center gap-1.5 text-xs text-d-text-2 cursor-pointer">
@@ -349,20 +372,22 @@ export default function ModelSearch({
         const iconColor = rel === 'rec' ? 'text-d-green' : rel === 'warn' ? 'text-d-amber' : 'text-d-red';
         return (
           <div key={`head-${engineKey(engine)}`} className={`mt-3 rounded-lg ${tint} px-3 py-2.5`}>
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-              <TagIcon className={`w-4 h-4 ${iconColor} shrink-0`} />
-              <div className="min-w-0 flex-1">
+            {/* Movil: rejilla icono | texto | veredicto, y el boton debajo a todo
+                el ancho. Desde sm, la fila de siempre; el texto pide 16rem antes
+                de dejar que boton y veredicto le quiten sitio. */}
+            <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-2.5 gap-y-2.5 sm:flex sm:flex-wrap sm:items-center sm:gap-x-3 sm:gap-y-2">
+              <TagIcon className={`w-4 h-4 ${iconColor} shrink-0 mt-0.5 sm:mt-0`} />
+              <div className="min-w-0 sm:flex-1 sm:basis-64">
                 {asked && (
                   <span className="inline-block text-[10px] font-semibold uppercase tracking-wide text-d-accent bg-d-accent/10 rounded px-1.5 py-0.5 mb-1">Lo que pidió el cliente</span>
                 )}
-                <p className="text-d-text text-sm font-semibold">
-                  {engine.name}
-                  {engineMeta(engine) && <span className="text-d-dim font-normal"> · {engineMeta(engine)}</span>}
-                </p>
+                <p className="text-d-text text-sm font-semibold">{engineTitle(engine)}</p>
                 {engine.note && <p className="text-d-muted text-xs mt-0.5">{engine.note}</p>}
               </div>
-              {sourceButton(engine, true)}
-              <span className={`d-tag ${tag.cls} shrink-0`}>{asked ? tag.label : 'Recomendado'}</span>
+              <div className={ACTIONS_CLS}>
+                {sourceButton(engine, true)}
+                <span className={`d-tag ${tag.cls} shrink-0`}>{asked ? tag.label : 'Recomendado'}</span>
+              </div>
             </div>
             {renderListings(engine)}
           </div>
@@ -375,17 +400,16 @@ export default function ModelSearch({
           {others.map(e => {
             const tag = RELIABILITY_TAG[reliabilityOf(e)];
             return (
-              <div key={engineKey(e)} className="py-2.5">
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-d-text-2 text-[13px] font-medium">
-                      {e.name}
-                      {engineMeta(e) && <span className="text-d-dim font-normal"> · {engineMeta(e)}</span>}
-                    </p>
+              <div key={engineKey(e)} className="py-3 sm:py-2.5">
+                <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-2.5 gap-y-2.5 sm:flex sm:flex-wrap sm:items-center sm:gap-x-3 sm:gap-y-2">
+                  <div className="min-w-0 sm:flex-1 sm:basis-64">
+                    <p className="text-d-text-2 text-[13px] font-medium">{engineTitle(e)}</p>
                     {e.note && <p className="text-d-dim text-[11px] mt-0.5">{e.note}</p>}
                   </div>
-                  {!e.avoid && sourceButton(e, false)}
-                  <span className={`d-tag ${tag.cls} shrink-0`}>{tag.label}</span>
+                  <div className={ACTIONS_CLS}>
+                    {!e.avoid && sourceButton(e, false)}
+                    <span className={`d-tag ${tag.cls} shrink-0`}>{tag.label}</span>
+                  </div>
                 </div>
                 {!e.avoid && renderListings(e)}
               </div>
