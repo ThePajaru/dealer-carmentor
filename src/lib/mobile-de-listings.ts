@@ -59,13 +59,70 @@ function num(s?: string | null): number | null {
   return digits ? parseInt(digits, 10) : null;
 }
 
-function mapListing(it: any): MobileListing | null {
+/** Unescape a JSON string body captured by a regex (`"…"` without the quotes). */
+function jsonStr(s: string): string {
+  try { return JSON.parse('"' + s + '"'); } catch { return s; }
+}
+
+/**
+ * Title + photo per ad id, read from the rendered result cards.
+ *
+ * Since ~2026-09 the `searchResults.listings` JSON no longer carries `title` or
+ * `images` — only id, attr, price, rating and seller. Both now live solely in the
+ * card elements the RSC stream renders: each card opens with
+ * `"testId":"base-result-listing-N"`, holds the photo as `"src":"img.classistatic.de/…"`,
+ * the title component (`"title":"BMW 116i …"`) and points back to its ad via
+ * `"listingId":<id>` or `"attr":"$…:searchResults:listings:K:attr"`. We split the
+ * payload on card starts and read each segment on its own, so a card's photo
+ * can never bleed into the next ad.
+ */
+function extractCards(payload: string, listings: any[]): Map<string, { title: string | null; image: string | null }> {
+  const cards = new Map<string, { title: string | null; image: string | null }>();
+  const starts: number[] = [];
+  const startRe = /"testId":"base-result-listing-\d+"/g;
+  let m: RegExpExecArray | null;
+  while ((m = startRe.exec(payload)) !== null) starts.push(m.index);
+
+  for (let i = 0; i < starts.length; i++) {
+    // Each card spans from its own start to the next card's (the title/attr of
+    // card N sit AFTER its testId, before card N+1 begins).
+    const seg = payload.slice(starts[i], starts[i + 1] ?? starts[i] + 20000);
+    let id = /"listingId":(\d+)/.exec(seg)?.[1] ?? null;
+    if (!id) {
+      const k = /searchResults:listings:(\d+):attr/.exec(seg)?.[1];
+      const ref = k != null ? listings[Number(k)] : null;
+      id = ref?.id != null ? String(ref.id) : null;
+    }
+    if (!id) id = /details\.html\?id=(\d+)/.exec(seg)?.[1] ?? null;
+    if (!id || cards.has(id)) continue;
+
+    const src = /"src":"((?:[^"\\]|\\.)*img\.classistatic\.de(?:[^"\\]|\\.)*)"/.exec(seg)?.[1];
+    const title = /"testId":"base-result-listing-\d+-title","title":"((?:[^"\\]|\\.)*)"/.exec(seg)?.[1]
+      ?? /"title":"((?:[^"\\]|\\.)*)"/.exec(seg)?.[1];
+    cards.set(id, {
+      title: title ? jsonStr(title).trim() : null,
+      image: src ? imageUrl(jsonStr(src)) : null,
+    });
+  }
+  return cards;
+}
+
+/** mobile.de image path (with or without scheme) → a 640px JPEG URL. */
+function imageUrl(uri: string): string {
+  const bare = String(uri).replace(/^\/*/, '').replace(/^https?:\/\//, '').replace(/\?.*$/, '');
+  return `https://${bare}?rule=mo-640.jpg`;
+}
+
+function mapListing(it: any, card?: { title: string | null; image: string | null }): MobileListing | null {
   const id = it?.id != null ? String(it.id) : null;
   const price = num(it?.p) ?? (Number.isFinite(it?.price?.grs?.amount) ? Math.round(it.price.grs.amount) : null);
   if (!id || price == null || price < 500) return null;
 
   const attr = it.attr || {};
-  const title = String(it.title || `${it.shortTitle || ''} ${it.subTitle || ''}`).trim().slice(0, 140);
+  const makeModel = `${it.make?.localized || ''} ${it.model?.localized || ''}`.trim();
+  const title = String(
+    it.title || card?.title || `${it.shortTitle || ''} ${it.subTitle || ''}`.trim() || makeModel,
+  ).trim().slice(0, 140);
   const km = num(attr.ml);
   const yearMatch = /((?:19|20)\d{2})/.exec(attr.fr || '');
   const year = yearMatch ? parseInt(yearMatch[1], 10) : null;
@@ -73,14 +130,15 @@ function mapListing(it: any): MobileListing | null {
   const power_cv = psMatch ? parseInt(psMatch[1], 10) : null;
 
   const uri: string | null = it.images?.[0]?.uri || null;
-  const image = uri ? `https://${String(uri).replace(/^\/*/, '').replace(/^https?:\/\//, '')}?rule=mo-640.jpg` : null;
+  const image = uri ? imageUrl(uri) : card?.image ?? null;
 
   // "19,00% MwSt." on the ad ⇒ VAT shown separately ⇒ deductible; empty ⇒ not.
   const vat_deductible = /mwst|%/i.test(String(it.vat || ''));
+  // FSBO ("for sale by owner") is how the current payload marks a private seller.
   const enumType = it.contact?.enumType;
   const seller_type: 'DEALER' | 'PRIVATE' | null =
     enumType === 'DEALER' || it.st === 'Händler' ? 'DEALER'
-    : enumType === 'PRIVATE' || it.st ? 'PRIVATE' : null;
+    : enumType === 'PRIVATE' || enumType === 'FSBO' || it.st ? 'PRIVATE' : null;
   const rating = (typeof it.priceRating === 'object' ? it.priceRating?.rating : it.priceRating) || null;
 
   return {
@@ -99,10 +157,11 @@ export function parseMobileListings(html: string): MobileListing[] {
   try { arr = JSON.parse(arrTxt); } catch { return []; }
   if (!Array.isArray(arr)) return [];
 
+  const cards = extractCards(payload, arr);
   const out: MobileListing[] = [];
   const seen = new Set<string>();
   for (const it of arr) {
-    const mapped = mapListing(it);
+    const mapped = mapListing(it, it?.id != null ? cards.get(String(it.id)) : undefined);
     if (mapped?.id && !seen.has(mapped.id)) { seen.add(mapped.id); out.push(mapped); }
   }
   return out;

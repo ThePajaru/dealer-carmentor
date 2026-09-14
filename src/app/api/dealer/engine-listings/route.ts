@@ -281,8 +281,13 @@ export async function POST(request: NextRequest) {
         .select('listings, total_count, scraped_at')
         .eq('search_url', searchUrl)
         .maybeSingle();
-      if (data && Date.now() - new Date(data.scraped_at as string).getTime() < CACHE_TTL) {
-        rawListings = (data.listings as EngineListing[]) || [];
+      const cached = (data?.listings as EngineListing[] | null) || [];
+      // Lots cached while the parser missed mobile.de's new card layout have no
+      // photo on ANY ad — treat those as stale so the dealer doesn't see blanks
+      // for up to 6 h.
+      const photoless = cached.length > 0 && cached.every(l => !l.image);
+      if (data && !photoless && Date.now() - new Date(data.scraped_at as string).getTime() < CACHE_TTL) {
+        rawListings = cached;
         totalCount = (data.total_count as number | null) ?? null;
       }
     } catch { /* cache miss / table absent — scrape below */ }

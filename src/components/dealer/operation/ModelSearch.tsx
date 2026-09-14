@@ -41,7 +41,15 @@ interface SourcingState {
   search_url: string | null;
 }
 
+/** Where an ad stands once the dealer sends it to analyze. */
+export type AdAnalysisState = 'pending' | 'done' | 'failed';
+
 const PREVIEW_COUNT = 4;
+
+// «Sin resultados»: one click widens the lot instead of making the dealer guess
+// numbers — price +20 % (rounded up to 500 €), km +30.000 (to 10.000).
+const widenPrice = (v: number) => Math.ceil((v * 1.2) / 500) * 500;
+const widenKm = (v: number) => Math.ceil((v + 30_000) / 10_000) * 10_000;
 
 // Boton + veredicto de una fila de motor. En movil el envoltorio no existe
 // (`contents`): sus hijos son celdas de la rejilla de la fila. Desde sm van
@@ -65,14 +73,15 @@ function reliabilityOf(e: Engine): 'rec' | 'warn' | 'bad' {
 const engineKey = (e: Engine) => `${e.name}·${e.power_cv ?? '?'}`;
 
 export default function ModelSearch({
-  vehicle, token, isSelected, toggle, full, analyzedUrls,
+  vehicle, token, isSelected, toggle, full, analysisStatus,
 }: {
   vehicle: SearchVehicle;
   token: string;
   isSelected: (url: string) => boolean;
   toggle: (l: Listing) => void;
   full: boolean;
-  analyzedUrls: Set<string>;
+  /** Ads already sent to analyze, by URL — pending, done or failed. */
+  analysisStatus: Map<string, AdAnalysisState>;
 }) {
   const { make, model, min_year: minYear, max_year: maxYear, min_cv: minCv, fuel } = vehicle;
 
@@ -155,8 +164,12 @@ export default function ModelSearch({
   const headSet = new Set(heads.map(h => h.engine));
   const others = rankEngines(data.engines.filter(e => !headSet.has(e)), data.recommended, { fuel, minCv }, 4);
 
-  const sourceEngine = async (engine: Engine) => {
+  // `override` lets «Ampliar búsqueda» search with the widened numbers right
+  // away — the state setters only land on the next render.
+  const sourceEngine = async (engine: Engine, override?: { maxPrice?: string; maxKm?: string }) => {
     const key = engineKey(engine);
+    const maxPrice = override?.maxPrice ?? fMaxPrice;
+    const maxKm = override?.maxKm ?? fMaxKm;
     setSourcing(prev => ({ ...prev, [key]: { loading: true, error: null, listings: null, search_url: prev[key]?.search_url || null } }));
     try {
       const res = await fetch('/api/dealer/engine-listings', {
@@ -166,8 +179,8 @@ export default function ModelSearch({
           make, model,
           engine: { name: engine.name, fuel: engine.fuel, power_cv: engine.power_cv },
           filters: {
-            max_price: fMaxPrice ? Number(fMaxPrice) : null,
-            max_km: fMaxKm ? Number(fMaxKm) : null,
+            max_price: maxPrice ? Number(maxPrice) : null,
+            max_km: maxKm ? Number(maxKm) : null,
             min_year: fMinYear ? Number(fMinYear) : null,
             max_year: fMaxYear ? Number(fMaxYear) : null,
             transmission: fTrans || null,
@@ -224,10 +237,50 @@ export default function ModelSearch({
     }
     if (!st.listings) return null;
     if (st.listings.length === 0) {
+      const nextPrice = fMaxPrice ? String(widenPrice(Number(fMaxPrice))) : '';
+      const nextKm = fMaxKm ? String(widenKm(Number(fMaxKm))) : '';
+      const canWiden = !!(nextPrice || nextKm);
+      const widenLabel = [
+        nextPrice ? `${Number(nextPrice).toLocaleString('es-ES')} €` : null,
+        nextKm ? `${Number(nextKm).toLocaleString('es-ES')} km` : null,
+      ].filter(Boolean).join(' y ');
+      const widen = () => {
+        if (nextPrice) setFMaxPrice(nextPrice);
+        if (nextKm) setFMaxKm(nextKm);
+        sourceEngine(engine, { maxPrice: nextPrice || undefined, maxKm: nextKm || undefined });
+      };
       return (
-        <div className="mt-2.5">
-          <p className="text-d-dim text-xs">Sin resultados con estos filtros — prueba a relajar precio o km.</p>
-          <ResearchLink onRetry={() => sourceEngine(engine)} searchUrl={st.search_url} />
+        <div className="mt-2.5 rounded-lg border border-d-amber/30 bg-d-amber/[0.06] px-3 py-2.5" role="alert">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 text-d-amber shrink-0 mt-0.5" />
+            <div className="min-w-0 flex-1">
+              <p className="text-d-text text-xs font-semibold">No hay anuncios con estos filtros</p>
+              <p className="text-d-muted text-[11px] mt-0.5">
+                Buscando hasta{' '}
+                <span className="d-num text-d-text-2">{fMaxPrice ? `${Number(fMaxPrice).toLocaleString('es-ES')} €` : 'cualquier precio'}</span>
+                {' · '}
+                <span className="d-num text-d-text-2">{fMaxKm ? `${Number(fMaxKm).toLocaleString('es-ES')} km` : 'cualquier km'}</span>.
+                {canWiden ? ' Amplía el precio y los km para ver más coches.' : ' Prueba con otros años, cambio o versión en Ajustes.'}
+              </p>
+            </div>
+          </div>
+          <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-2">
+            {canWiden && (
+              <button
+                onClick={widen}
+                className="d-btn-primary inline-flex items-center justify-center gap-1.5 px-3 py-2 sm:py-1.5 rounded-lg text-xs sm:text-[11px] font-semibold max-sm:w-full"
+              >
+                <RotateCcw className="w-3.5 h-3.5" /> Volver a buscar hasta {widenLabel}
+              </button>
+            )}
+            <button
+              onClick={() => setShowFilters(true)}
+              className="inline-flex items-center gap-1 text-[11px] font-medium text-d-dim hover:text-d-text transition-colors"
+            >
+              <SlidersHorizontal className="w-3 h-3" /> Ajustar a mano
+            </button>
+            <ResearchLink onRetry={() => sourceEngine(engine)} searchUrl={st.search_url} inline />
+          </div>
         </div>
       );
     }
@@ -242,7 +295,7 @@ export default function ModelSearch({
               key={l.url}
               listing={l}
               selected={isSelected(l.url)}
-              analyzed={analyzedUrls.has(l.url)}
+              analysis={analysisStatus.get(l.url) ?? null}
               blocked={full && !isSelected(l.url)}
               onToggle={() => toggle(l)}
             />
@@ -439,22 +492,31 @@ function ResearchLink({ onRetry, searchUrl, inline }: { onRetry: () => void; sea
 
 /** A single ad — the ONE place a card is justified, because you pick it. */
 function ListingTile({
-  listing: l, selected, analyzed, blocked, onToggle,
+  listing: l, selected, analysis, blocked, onToggle,
 }: {
   listing: Listing;
   selected: boolean;
-  analyzed: boolean;
+  analysis: AdAnalysisState | null;
   blocked: boolean;
   onToggle: () => void;
 }) {
   const badge = l.rating ? RATING_BADGE[l.rating] : null;
-  const disabled = analyzed || blocked;
+  const disabled = !!analysis || blocked;
+  // Sent to analyze: the tile stays readable (only a tile blocked by the batch
+  // cap fades) and its button tells where the analysis is, live.
+  const stateCls = analysis === 'pending'
+    ? 'border-d-accent/50 bg-d-accent/[0.04]'
+    : analysis === 'done'
+      ? 'border-d-green/40 bg-d-green/[0.04]'
+      : analysis === 'failed'
+        ? 'border-d-amber/40'
+        : null;
   return (
     <div
       onClick={() => !disabled && onToggle()}
       className={`rounded-lg border overflow-hidden flex flex-col transition-colors ${
-        selected ? 'border-d-accent ring-1 ring-d-accent bg-d-accent/5' : 'border-d-border bg-d-surface-2/40'
-      } ${disabled ? 'opacity-60 cursor-default' : 'cursor-pointer hover:border-d-border-strong'}`}
+        selected ? 'border-d-accent ring-1 ring-d-accent bg-d-accent/5' : stateCls || 'border-d-border bg-d-surface-2/40'
+      } ${analysis ? 'cursor-default' : blocked ? 'opacity-60 cursor-default' : 'cursor-pointer hover:border-d-border-strong'}`}
     >
       {l.image ? (
         <img src={l.image} alt="" loading="lazy" className="w-full h-24 object-cover" />
@@ -484,12 +546,19 @@ function ListingTile({
             disabled={disabled}
             title={blocked ? 'Has llegado al máximo de la tanda' : undefined}
             className={`flex-1 py-1.5 rounded-md text-[11px] font-semibold inline-flex items-center justify-center gap-1 transition-colors ${
-              analyzed ? 'bg-d-green/15 text-d-green' : selected ? 'bg-d-accent text-[#141619]' : 'text-d-text-2 border border-d-border hover:bg-d-surface-3'
+              analysis === 'pending' ? 'bg-d-accent/15 text-d-accent'
+                : analysis === 'done' ? 'bg-d-green/15 text-d-green'
+                  : analysis === 'failed' ? 'bg-d-amber/15 text-d-amber'
+                    : selected ? 'bg-d-accent text-[#141619]' : 'text-d-text-2 border border-d-border hover:bg-d-surface-3'
             }`}
           >
-            {analyzed
-              ? <><CheckCircle2 className="w-3 h-3" /> Ya analizado</>
-              : selected
+            {analysis === 'pending'
+              ? <><Loader2 className="w-3 h-3 animate-spin" /> Analizando…</>
+              : analysis === 'done'
+                ? <><CheckCircle2 className="w-3 h-3" /> Analizado</>
+                : analysis === 'failed'
+                  ? <><AlertTriangle className="w-3 h-3" /> No se completó</>
+                  : selected
                 ? <><CheckCircle2 className="w-3 h-3" /> Seleccionado</>
                 : <><Plus className="w-3 h-3" /> Seleccionar</>}
           </button>

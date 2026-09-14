@@ -4,27 +4,30 @@ import { useState } from 'react';
 import { Loader2, Sparkles } from 'lucide-react';
 import { useDealer } from '@/hooks/useDealer';
 import { DEALER_PLAN_LIMITS, type DealerPlanType } from '@/lib/dealer-plans';
-import ModelSearch, { type SearchVehicle } from './ModelSearch';
+import ModelSearch, { type SearchVehicle, type AdAnalysisState } from './ModelSearch';
 import type { Listing } from '@/lib/dealer/sourcing';
 
 // The búsqueda workspace: search every requested model IN-APP, tick the ads you
 // like across any engine or model, and analyze the whole selection in one click.
 // The selection lives here (not per model) so it follows the dealer across the
-// page; the floating bar is the single "Analizar" action.
+// page; the floating bar is the single "Analizar" action — and, while a batch
+// runs, its live progress.
 
 /** Cap per batch: the backend takes 25, but each ad spends one analysis of the
  *  dealer's plan — 5 keeps you comparing candidates without burning the cupo. */
 const MAX_SELECTION = 5;
 
 export default function BuscarSearch({
-  vehicles, token, requestId, onAnalyzed, analyzedUrls,
+  vehicles, token, requestId, onAnalyzed, analysisStatus, batchProgress,
 }: {
   vehicles: SearchVehicle[];
   token: string;
   requestId: string;
-  onAnalyzed: () => void | Promise<void>;
-  /** source_urls already analyzed for this operation — those ads show "Ya analizado". */
-  analyzedUrls: Set<string>;
+  onAnalyzed: (urls: string[]) => void | Promise<void>;
+  /** Ads of this operation already sent to analyze, by source_url. */
+  analysisStatus: Map<string, AdAnalysisState>;
+  /** The batch still running, if any — drives the progress bar. */
+  batchProgress: { total: number; finished: number } | null;
 }) {
   const { dealerProfile } = useDealer();
   const planKey = (dealerProfile?.plan || 'dealer') as DealerPlanType;
@@ -48,8 +51,10 @@ export default function BuscarSearch({
     });
   };
 
-  // Ads already analyzed (from the DB) plus the ones just queued this session.
-  const analyzed = new Set<string>([...analyzedUrls, ...justQueued]);
+  // Ads with a lead in the DB carry their real state; the ones queued this
+  // session show "Analizando…" until the refetch brings their lead row.
+  const status = new Map(analysisStatus);
+  justQueued.forEach(u => { if (!status.has(u)) status.set(u, 'pending'); });
 
   const analyzeSelected = async () => {
     if (!selected.length || sending) return;
@@ -68,7 +73,7 @@ export default function BuscarSearch({
       }
       setJustQueued(prev => new Set([...prev, ...urls]));
       setSelected([]);
-      await onAnalyzed();
+      await onAnalyzed(urls);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -77,6 +82,8 @@ export default function BuscarSearch({
   };
 
   if (vehicles.length === 0) return null;
+
+  const showProgress = selected.length === 0 && !!batchProgress && batchProgress.finished < batchProgress.total;
 
   return (
     <div>
@@ -88,7 +95,7 @@ export default function BuscarSearch({
           isSelected={isSelected}
           toggle={toggle}
           full={full}
-          analyzedUrls={analyzed}
+          analysisStatus={status}
         />
       ))}
 
@@ -118,6 +125,30 @@ export default function BuscarSearch({
               {sending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
               Analizar {selected.length}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Batch progress — the dealer can keep browsing; a popup opens when done. */}
+      {showProgress && (
+        <div className="fixed inset-x-0 bottom-0 z-40 flex justify-center p-4 pointer-events-none" role="status" aria-live="polite">
+          <div className="pointer-events-auto w-full max-w-sm rounded-xl border border-d-border-strong bg-d-surface-3 px-4 py-3 shadow-2xl">
+            <div className="flex items-center gap-2.5">
+              <Loader2 className="w-4 h-4 text-d-accent animate-spin shrink-0" />
+              <div className="min-w-0 flex-1">
+                <p className="text-d-text text-[13px] font-semibold">
+                  Analizando <span className="d-num">{batchProgress!.total}</span> coche{batchProgress!.total === 1 ? '' : 's'}
+                  <span className="text-d-dim font-normal"> · <span className="d-num">{batchProgress!.finished}</span> de <span className="d-num">{batchProgress!.total}</span> listos</span>
+                </p>
+                <p className="text-d-dim text-[11px]">Tarda un par de minutos. Puedes seguir buscando — te avisamos al terminar.</p>
+              </div>
+            </div>
+            <div className="mt-2.5 h-1 rounded-full bg-d-surface-2 overflow-hidden">
+              <div
+                className="h-full bg-d-accent transition-[width] duration-500"
+                style={{ width: `${Math.max(8, (batchProgress!.finished / batchProgress!.total) * 100)}%` }}
+              />
+            </div>
           </div>
         </div>
       )}

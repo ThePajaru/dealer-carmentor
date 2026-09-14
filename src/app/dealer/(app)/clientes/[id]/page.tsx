@@ -21,6 +21,7 @@ import { DealerAnalysisPeek } from '@/components/dealer/DealerAnalysisReport';
 import { PhotoStrip } from '@/components/dealer/PhotoLightbox';
 import { AnalyzingCard } from '@/components/dealer/AnalyzeStages';
 import BuscarSearch from '@/components/dealer/operation/BuscarSearch';
+import type { AdAnalysisState } from '@/components/dealer/operation/ModelSearch';
 import TramitesPanel, { type ServiceOrderLite } from '@/components/dealer/operation/TramitesPanel';
 import { consumeAnalyzeStream } from '@/lib/analyze-stream';
 import { buildInitialPresupuestoData, renderPresupuestoHtml, type PresupuestoData as PresupuestoContent } from '@/lib/presupuesto-template';
@@ -373,6 +374,10 @@ export default function ClientDetailPage() {
   const [retriedAt, setRetriedAt] = useState<Record<string, number>>({});
   const [retrying, setRetrying] = useState<Set<string>>(new Set());
   const pollTokenRef = useRef(0);
+  // Ads sent from the in-app search in the batch still running, and the tally
+  // once every one has finished (or given up) — that tally opens the popup.
+  const [searchBatch, setSearchBatch] = useState<string[] | null>(null);
+  const [batchResult, setBatchResult] = useState<{ ok: number; failed: number } | null>(null);
 
   const leadIsPending = (l: LeadData) =>
     !l.car_analyses || l.car_analyses.result_json?.status === 'in_progress';
@@ -1098,14 +1103,43 @@ export default function ClientDetailPage() {
 
   const shortlistedCount = leads.filter(l => l.is_shortlisted).length;
 
-  // In-app search → tick ads across engines/models → analyze in one batch. The
-  // set of already-analyzed URLs marks those ads as done so they aren't re-run.
-  const analyzedUrlSet = new Set(leads.map(l => l.source_url));
-  const handleSearchAnalyzed = async () => {
+  // In-app search → tick ads across engines/models → analyze in one batch. Each
+  // ad's state (same rules as the lead cards in step 2: an analysis still
+  // running after STUCK_AFTER_MS counts as failed) marks it in the search, so the
+  // dealer sees "Analizando…" turn into "Analizado" without reloading.
+  const adStatus = useMemo(() => {
+    const map = new Map<string, AdAnalysisState>();
+    // Oldest first, so a re-analysis of the same ad wins.
+    [...leads]
+      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+      .forEach(l => {
+        const rj = l.car_analyses?.result_json;
+        const pending = !l.car_analyses || rj?.status === 'in_progress';
+        const startedAt = Math.max(new Date(l.created_at).getTime(), retriedAt[l.id] || 0);
+        map.set(l.source_url, pending
+          ? (nowTick - startedAt > STUCK_AFTER_MS ? 'failed' : 'pending')
+          : (rj?.status === 'failed' || rj?.error ? 'failed' : 'done'));
+      });
+    return map;
+  }, [leads, nowTick, retriedAt, STUCK_AFTER_MS]);
+
+  const batchFinished = searchBatch ? searchBatch.filter(u => { const s = adStatus.get(u); return s === 'done' || s === 'failed'; }).length : 0;
+  useEffect(() => {
+    if (!searchBatch?.length || batchFinished < searchBatch.length) return;
+    const ok = searchBatch.filter(u => adStatus.get(u) === 'done').length;
+    setBatchResult({ ok, failed: searchBatch.length - ok });
+    setSearchBatch(null);
+  }, [searchBatch, batchFinished, adStatus]);
+
+  const handleSearchAnalyzed = async (urls: string[]) => {
+    setBatchResult(null);
+    setSearchBatch(prev => [...new Set([...(prev || []), ...urls])]);
     const fresh = await fetchData();
     advanceTo('busqueda'); // first candidate analyzed = sourcing is underway
     setActiveStep('analizar'); // seguir buscando y analizando
-    if ((fresh?.leads || []).some(leadIsPending)) startPolling();
+    // Poll a little past the stuck threshold so a hung analysis still flips to
+    // "No se completó" and the batch popup always opens.
+    if ((fresh?.leads || []).some(leadIsPending)) startPolling(STUCK_AFTER_MS + 20_000);
   };
 
   // The vehicle profiles the customer has in mind (one operación, N cars). New
@@ -1680,7 +1714,8 @@ export default function ClientDetailPage() {
                 token={session?.access_token || ''}
                 requestId={client.id}
                 onAnalyzed={handleSearchAnalyzed}
-                analyzedUrls={analyzedUrlSet}
+                analysisStatus={adStatus}
+                batchProgress={searchBatch ? { total: searchBatch.length, finished: batchFinished } : null}
               />
             )}
             {analyzeBox}
@@ -2452,6 +2487,47 @@ Así funciona una operación: <span className="text-d-text">cada paso es una pes
             <div className="flex justify-end gap-2 mt-4">
               <button onClick={() => setConfirmBox(null)} className="d-btn-ghost text-sm px-3.5 py-2 rounded-lg">Cancelar</button>
               <Button onClick={() => { const fn = confirmBox.onYes; setConfirmBox(null); fn(); }} className="d-btn-primary text-sm">Confirmar</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Batch finished — every ad sent from the search has its analysis (or
+          gave up). Hands the dealer straight to the next step. */}
+      {batchResult && (
+        <div className="fixed inset-0 z-[70] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setBatchResult(null)}>
+          <div role="dialog" aria-modal="true" aria-labelledby="batch-done-title" className="d-card w-full max-w-sm p-5" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-3">
+              <span className={`grid place-items-center w-10 h-10 rounded-full shrink-0 ${batchResult.ok > 0 ? 'bg-d-green/15 text-d-green' : 'bg-d-amber/15 text-d-amber'}`}>
+                {batchResult.ok > 0 ? <CheckCircle2 className="w-5 h-5" /> : <AlertTriangle className="w-5 h-5" />}
+              </span>
+              <h3 id="batch-done-title" className="text-d-text text-base font-semibold leading-tight">
+                {batchResult.ok > 0 ? 'Análisis terminados' : 'Los análisis no se completaron'}
+              </h3>
+            </div>
+            <p className="text-d-text-2 text-sm leading-relaxed mt-3">
+              {batchResult.ok > 0 ? (
+                <>
+                  <span className="d-num font-semibold text-d-text">{batchResult.ok}</span> coche{batchResult.ok === 1 ? ' analizado' : 's analizados'}
+                  {batchResult.failed > 0 && <> · <span className="d-num">{batchResult.failed}</span> no se pudo completar (reinténtalo en el paso 2)</>}
+                  . Ya puedes compararlos y marcar tu finalista.
+                </>
+              ) : (
+                <>Ninguno de los <span className="d-num">{batchResult.failed}</span> anuncios terminó su análisis. Puedes reintentarlos desde el paso 2.</>
+              )}
+            </p>
+            <div className="flex flex-wrap justify-end gap-2 mt-5">
+              <button onClick={() => setBatchResult(null)} className="d-btn-ghost text-sm px-3.5 py-2 rounded-lg">Seguir buscando</button>
+              <Button
+                onClick={() => {
+                  setBatchResult(null);
+                  setActiveStep('elegir');
+                  setTimeout(() => document.getElementById('workspace')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
+                }}
+                className="d-btn-primary text-sm"
+              >
+                {batchResult.ok > 0 ? 'Pasar a elegir finalista' : 'Ir al paso 2'} <ChevronRight className="w-4 h-4 ml-1" />
+              </Button>
             </div>
           </div>
         </div>
