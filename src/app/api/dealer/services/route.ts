@@ -3,13 +3,14 @@ import { requireDealerAuth, AuthError, dealerServiceClient } from '@/lib/dealer-
 import { stripe } from '@/lib/stripe';
 import { logDealerEvent } from '@/lib/dealer/events';
 import {
-  SERVICES, serviceDef, servicePriceId, isServiceKey, type ServiceKey,
+  SERVICES, serviceDef, servicePriceId, isServiceKey, serviceReadiness, type ServiceKey,
 } from '@/lib/dealer/services';
 import { signResult } from '@/lib/dealer/service-files';
 
 // Encargos de los servicios con persona detrás (gestor: 576 + IVTM · ingeniero:
-// ficha reducida). El precio NUNCA se escribe aquí: se lee del price de Stripe
-// y se cachea en memoria, así el importe que ve el dealer es el que va a pagar.
+// ficha reducida). Precio: el price de Stripe si está configurado (cacheado en
+// memoria), y si no el listPriceCents de services.ts cobrado con price_data. En
+// los dos casos el importe que ve el dealer es el mismo que va a pagar.
 
 interface CachedPrice { amountCents: number | null; currency: string; at: number }
 const priceCache = new Map<string, CachedPrice>();
@@ -46,10 +47,9 @@ async function catalog() {
       who: s.who,
       desc: s.desc,
       deliverable: s.deliverable,
-      // configured=false → el price no está en las variables de entorno todavía:
-      // la UI enseña el servicio pero sin botón de pago (y no un 500 al pulsar).
-      configured: !!servicePriceId(s.key),
-      amount_cents: price?.amountCents ?? null,
+      // Siempre contratable: sin price de Stripe se cobra el precio base.
+      configured: true,
+      amount_cents: price?.amountCents ?? s.listPriceCents,
       currency: price?.currency ?? 'eur',
     };
   }));
@@ -111,16 +111,26 @@ export async function POST(request: NextRequest) {
     // La operación tiene que ser de este dealer — nunca se confía en el body.
     const { data: job } = await dealerServiceClient
       .from('dealer_client_requests')
-      .select('id, stage, client_name')
+      .select('id, stage, client_name, runner_report')
       .eq('id', requestId)
       .eq('dealer_id', dealerProfile.id)
       .maybeSingle();
     if (!job) return NextResponse.json({ error: 'Operación no encontrada' }, { status: 404 });
 
-    const priceId = servicePriceId(kind);
-    if (!priceId) {
-      return NextResponse.json({ error: 'Servicio no disponible todavía' }, { status: 503 });
+    // Mismo bloqueo que la UI: sin las fotos del runner no se cobra un trabajo
+    // que el gestor o el ingeniero no pueden hacer.
+    const readiness = serviceReadiness(kind, job.runner_report);
+    if (!readiness.ready) {
+      return NextResponse.json({
+        error: readiness.sinInforme
+          ? 'El runner todavía no ha enviado la inspección'
+          : `Faltan fotos del runner: ${readiness.faltan.join(', ')}`,
+        faltan: readiness.faltan,
+      }, { status: 422 });
     }
+
+    const priceId = servicePriceId(kind);
+    const def = serviceDef(kind)!;
 
     const payload = (body.payload && typeof body.payload === 'object') ? body.payload : {};
     const now = new Date().toISOString();
@@ -188,7 +198,16 @@ export async function POST(request: NextRequest) {
 
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
-      line_items: [{ price: priceId, quantity: 1 }],
+      line_items: [priceId
+        ? { price: priceId, quantity: 1 }
+        : {
+          price_data: {
+            currency: 'eur',
+            unit_amount: def.listPriceCents,
+            product_data: { name: def.label, description: def.deliverable },
+          },
+          quantity: 1,
+        }],
       mode: 'payment',
       success_url: `${caseUrl}?servicio=${kind}&pago=ok`,
       cancel_url: `${caseUrl}?servicio=${kind}&pago=cancel`,

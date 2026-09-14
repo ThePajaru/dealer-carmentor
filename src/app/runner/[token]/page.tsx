@@ -96,6 +96,8 @@ export default function RunnerPacketPage() {
   const { token } = useParams<{ token: string }>();
   const [packet, setPacket] = useState<Packet | null>(null);
   const [loading, setLoading] = useState(true);
+  // Las fotos de mobile.de caducan con el anuncio: si falla, el hueco con icono.
+  const [heroBroken, setHeroBroken] = useState(false);
 
   // Wizard position: -1 = landing, then one screen per step.
   const [stepIdx, setStepIdx] = useState(-1);
@@ -463,8 +465,8 @@ export default function RunnerPacketPage() {
         {stepIdx === -1 && !submitted && (
           <>
             <div className="d-card d-card-hl overflow-hidden">
-              {car.hero ? (
-                <img src={car.hero} alt="" className="w-full h-48 object-cover" />
+              {car.hero && !heroBroken ? (
+                <img src={car.hero} alt="" onError={() => setHeroBroken(true)} className="w-full h-48 object-cover" />
               ) : (
                 <div className="w-full h-48 bg-d-surface-2 grid place-items-center"><Car className="w-8 h-8 text-d-dim" /></div>
               )}
@@ -521,7 +523,7 @@ export default function RunnerPacketPage() {
 
             <p className="text-d-muted text-xs flex items-start gap-2">
               <Receipt className="w-4 h-4 text-d-accent shrink-0 mt-0.5" />
-              ¿Gastos del viaje (vuelo, gasolina, peajes…)? Añádelos cuando quieras con el botón <span className="text-d-text font-medium">＋ Gastos</span> de abajo a la derecha — está siempre a mano, también durante la inspección.
+              <span>¿Gastos del viaje (vuelo, gasolina, peajes…)? Añádelos cuando quieras con el botón <span className="text-d-text font-medium">＋ Gastos</span> de abajo a la derecha — está siempre a mano, también durante la inspección.</span>
             </p>
           </>
         )}
@@ -808,6 +810,11 @@ function PhotoScreen({ step, photo, showIntro, url, busy, onPick, onClear, note,
           </span>
         )}
         {photo.hint && <p className="text-d-muted text-xs mt-1 mb-3">{photo.hint}</p>}
+        {photo.aviso && (
+          <p className="text-d-amber text-xs mt-2 flex gap-1.5 rounded-lg border border-d-amber/30 bg-d-amber/10 px-2.5 py-2">
+            <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" /> {photo.aviso}
+          </p>
+        )}
         {url ? (
           <div className="relative rounded-lg overflow-hidden border border-d-border mt-3">
             <img src={url} alt={photo.label} className="w-full max-h-80 object-cover" />

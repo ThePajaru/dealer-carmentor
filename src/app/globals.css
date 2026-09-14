@@ -24,28 +24,6 @@
   --color-paper: #F7F9FF;
   --color-verdict: #059669;
   --color-verdict-deep: #047857;
-  /* Dealer B2B light theme tokens -> utilidades como bg-d-surface, text-d-accent.
-     En claro desde el 2026-09-10: el panel pasa a fondo blanco con la mecanica
-     del administrador de anuncios. Los grises llevan sesgo azul (no gris de
-     fabrica) para que casen con el azul de marca. El runner mantiene su tema
-     negro aparte (.runner-black): es un movil a pleno sol en Alemania. */
-  --color-d-bg: #f2f4f8;
-  --color-d-surface: #ffffff;
-  --color-d-surface-2: #f2f4f8;
-  --color-d-surface-3: #e8ecf4;
-  --color-d-border: #dde2ec;
-  --color-d-border-strong: #c6cede;
-  --color-d-text: #042152;
-  --color-d-text-2: #2c3a55;
-  --color-d-muted: #55688c;
-  --color-d-dim: #7c8aa6;
-  --color-d-accent: #2b5bd7;
-  --color-d-accent-2: #1f49b8;
-  --color-d-mid: #6B83BA;
-  --color-d-green: #0a7f5c;
-  --color-d-amber: #a8620a;
-  --color-d-red: #c0343c;
-  --color-d-purple: #7c3aed;
   /* AutoFlip brand colors as Tailwind v4 tokens */
   --color-autoflip-dark: var(--autoflip-dark);
   --color-autoflip-medium: var(--autoflip-medium);
@@ -85,6 +63,33 @@
   --radius-xl: calc(var(--radius) + 4px);
   /* Aurora background animation (aurora-background.tsx) */
   --animate-aurora: aurora 60s linear infinite;
+}
+
+/* Dealer B2B light theme tokens -> utilidades como bg-d-surface, text-d-accent.
+   En claro desde el 2026-09-10: el panel pasa a fondo blanco con la mecanica
+   del administrador de anuncios. Los grises llevan sesgo azul (no gris de
+   fabrica) para que casen con el azul de marca.
+   Bloque @theme SIN inline a proposito: asi las utilidades leen var(--color-d-*)
+   y un contenedor puede redefinir la paleta entera (el runner en oscuro, la
+   impresion en blanco). Con inline el valor se pega en la utilidad y no cambia. */
+@theme {
+  --color-d-bg: #f2f4f8;
+  --color-d-surface: #ffffff;
+  --color-d-surface-2: #f2f4f8;
+  --color-d-surface-3: #e8ecf4;
+  --color-d-border: #dde2ec;
+  --color-d-border-strong: #c6cede;
+  --color-d-text: #042152;
+  --color-d-text-2: #2c3a55;
+  --color-d-muted: #55688c;
+  --color-d-dim: #7c8aa6;
+  --color-d-accent: #2b5bd7;
+  --color-d-accent-2: #1f49b8;
+  --color-d-mid: #6B83BA;
+  --color-d-green: #0a7f5c;
+  --color-d-amber: #a8620a;
+  --color-d-red: #c0343c;
+  --color-d-purple: #7c3aed;
 }
 
 :root {
@@ -270,9 +275,42 @@
    the root/body background, which is white in the consumer theme. Scope strictly
    to pages that mount the dealer shell via :has(). */
 html:has(.dealer-root), body:has(.dealer-root){ background:#f2f4f8; }
-/* Runner field ficha: pure black for outdoor OLED readability. */
+/* Runner field ficha: fondo negro puro (OLED, movil a pleno sol en Alemania).
+   El panel es claro, asi que aqui se redefine la paleta d-* entera en oscuro con
+   sesgo azul de marca: tarjetas casi negras, texto claro, acentos mas luminosos
+   para que se lean sobre negro. Sin esto salian tarjetas blancas y titulos azul
+   marino invisibles sobre el negro. */
 html:has(.runner-black), body:has(.runner-black){ background:#000; }
-.runner-black{ background:#000; }
+.runner-black{
+  background:#000;
+  color:var(--color-d-text-2);
+  color-scheme:dark;
+  --color-d-bg:#000000;
+  --color-d-surface:#0b111e;
+  --color-d-surface-2:#131b2c;
+  --color-d-surface-3:#1c263b;
+  --color-d-border:#1f2940;
+  --color-d-border-strong:#2e3b58;
+  --color-d-text:#f3f6fc;
+  --color-d-text-2:#d5dcea;
+  --color-d-muted:#a1aec6;
+  --color-d-dim:#76849f;
+  --color-d-accent:#7a9fff;
+  --color-d-accent-2:#93b2ff;
+  --color-d-mid:#8fa3d4;
+  --color-d-green:#3ecf98;
+  --color-d-amber:#f5b546;
+  --color-d-red:#ff7b7b;
+  --color-d-purple:#b89cff;
+}
+/* Sin lavado aurora: sobre negro se veia como una mancha gris arriba a la derecha. */
+.dealer-root.runner-black::before, .dealer-root.runner-black::after{ content:none; }
+.runner-black .d-card, .runner-black .d-card-dashed{ box-shadow:none; }
+/* Boton primario con azul de marca solido: el acento claro de arriba es para
+   texto e iconos, con blanco encima no llega a contraste. */
+.runner-black .d-btn-primary{ background:#2b5bd7!important; }
+.runner-black .d-btn-primary:hover{ background:#3a6ae6!important; }
+.runner-black .d-input:focus{ border-color:rgba(122,159,255,.55); box-shadow:0 0 0 3px rgba(122,159,255,.15); }
 .dealer-root ::selection{background:rgba(43,91,215,.16)}
 .dealer-root :focus-visible{outline:2px solid #2b5bd7;outline-offset:2px;border-radius:6px}
 

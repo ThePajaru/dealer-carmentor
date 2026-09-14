@@ -1983,6 +1983,7 @@ export default function ClientDetailPage() {
             requestId={client.id}
             token={session?.access_token}
             runnerReport={client.runner_report}
+            runnerLink={runnerLink}
             onOrders={onServiceOrders}
             prefill={{
               iedmtInputs: chosenView?.iedmt?.inputs ?? null,

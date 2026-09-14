@@ -4,19 +4,20 @@
 // compra: el gestor presenta y paga el 576 + IVTM, y el ingeniero firma la
 // ficha técnica reducida con las fotos que el runner ya sacó.
 //
-// Se pagan por encargo (Stripe one-off). Lo que aquí se muestra del precio sale
-// de Stripe vía /api/dealer/services — nunca hay un importe escrito a mano.
+// Se pagan por encargo (Stripe one-off). El precio llega de /api/dealer/services
+// (price de Stripe o precio base de services.ts). Se enseña siempre, pero el
+// encargo queda bloqueado hasta que el runner suba las fotos que hacen falta.
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Stamp, FileSignature, Loader2, Check, Clock, AlertTriangle, ExternalLink, Camera,
-  ScanLine,
+  ScanLine, Lock, Copy,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { calculateIEDMT, REGION_LABELS, type IEDMTInputs, type Region } from '@/lib/iedmt';
 import {
-  fichaExpediente, fichaMissing, SERVICE_STATUS_LABELS,
-  type ServiceKey, type ServiceStatus,
+  fichaExpediente, serviceReadiness, SERVICE_STATUS_LABELS,
+  type ServiceKey, type ServiceStatus, type ServiceReadiness,
 } from '@/lib/dealer/services';
 import type { RunnerReport } from '@/components/dealer/RunnerReportReview';
 
@@ -59,6 +60,8 @@ interface Props {
   requestId: string;
   token: string | undefined;
   runnerReport: RunnerReport | null;
+  /** Link del runner, para mandárselo otra vez si faltan fotos. */
+  runnerLink?: string | null;
   /** Sube los encargos al paso, que decide con ellos si queda algo por cerrar. */
   onOrders?: (orders: ServiceOrderLite[]) => void;
   /** Datos del análisis del coche elegido, para no pedir dos veces lo que ya sabemos. */
@@ -111,7 +114,52 @@ function ResultBlock({ order }: { order: ServiceOrder }) {
   );
 }
 
-export default function TramitesPanel({ requestId, token, runnerReport, onOrders, prefill }: Props) {
+/** Encargo bloqueado: qué fotos faltan y el link para pedírselas al runner. */
+function Bloqueado({ readiness, runnerLink, mostrarFaltan = true }: {
+  readiness: ServiceReadiness;
+  runnerLink?: string | null;
+  mostrarFaltan?: boolean;
+}) {
+  const [copiado, setCopiado] = useState(false);
+  const copiar = async () => {
+    if (!runnerLink) return;
+    try {
+      await navigator.clipboard.writeText(runnerLink);
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2000);
+    } catch { /* sin permiso de portapapeles: el link sigue en la ficha del runner */ }
+  };
+  const n = readiness.faltan.length;
+  return (
+    <div className="rounded-lg border border-d-border bg-d-surface-2/50 p-3.5">
+      <p className="text-[13px] text-d-text-2 flex items-start gap-2">
+        <Lock className="w-4 h-4 text-d-dim shrink-0 mt-0.5" />
+        <span>
+          {readiness.sinInforme
+            ? 'Se desbloquea cuando tu runner envíe la inspección con estas fotos.'
+            : `Se desbloquea cuando el runner suba ${n === 1 ? 'la foto que falta' : `las ${n} fotos que faltan`}. Puede añadirlas desde su mismo link, en «Revisar / editar la inspección», y volver a enviar.`}
+        </span>
+      </p>
+      {mostrarFaltan && n > 0 && (
+        <div className="flex flex-wrap gap-1.5 mt-2.5 pl-6">
+          {readiness.faltan.map(l => (
+            <span key={l} className="d-pill inline-flex items-center gap-1 text-d-muted">
+              <Camera className="w-3 h-3" /> {l}
+            </span>
+          ))}
+        </div>
+      )}
+      {runnerLink && (
+        <button onClick={copiar} className="d-btn-ghost text-xs px-2.5 py-1.5 rounded-lg inline-flex items-center gap-1.5 mt-3 ml-6">
+          {copiado ? <Check className="w-3.5 h-3.5 text-d-green" /> : <Copy className="w-3.5 h-3.5" />}
+          {copiado ? 'Link copiado' : 'Copiar link del runner'}
+        </button>
+      )}
+    </div>
+  );
+}
+
+export default function TramitesPanel({ requestId, token, runnerReport, runnerLink, onOrders, prefill }: Props) {
   const [catalog, setCatalog] = useState<CatalogItem[]>([]);
   const [orders, setOrders] = useState<ServiceOrder[]>([]);
   const [loading, setLoading] = useState(true);
@@ -134,6 +182,10 @@ export default function TramitesPanel({ requestId, token, runnerReport, onOrders
       categoria_cee: string | null; bastidor: string | null;
       marca: string | null; modelo_tipo: string | null;
       potencia_kw: number | null; notas: string | null;
+      // Opcionales: lecturas guardadas antes del Teil II no los traen.
+      hsn?: string | null; tsn?: string | null; clase_emisiones?: string | null;
+      plazas?: number | null; titulares_anteriores?: number | null;
+      bastidor_coincide?: boolean | null;
     };
     km_utilizacion: number | null;
     leidas: string[];
@@ -197,10 +249,10 @@ export default function TramitesPanel({ requestId, token, runnerReport, onOrders
   }, [valoracion, co2, region, primeraMat, cvf]);
 
   const expediente = useMemo(() => fichaExpediente(runnerReport), [runnerReport]);
-  const faltan = useMemo(() => fichaMissing(expediente), [expediente]);
-  // La ficha se puede encargar EN CUANTO el runner manda su informe: el coche
-  // sigue en Alemania y el ingeniero ya puede trabajar con esas fotos. Antes del
-  // informe no hay expediente, asi que no hay nada que firmar.
+  // Los dos encargos se desbloquean en cuanto el runner tiene las fotos que
+  // hacen falta (con el coche aún en Alemania). La misma regla la aplica la API.
+  const impReady = useMemo(() => serviceReadiness('impuestos', runnerReport), [runnerReport]);
+  const fichaReady = useMemo(() => serviceReadiness('ficha_reducida', runnerReport), [runnerReport]);
   const hayInforme = !!runnerReport?.submitted_at;
 
   const leerDocumentos = async () => {
@@ -252,7 +304,6 @@ export default function TramitesPanel({ requestId, token, runnerReport, onOrders
       }
       : {
         photos: expediente.filter(p => p.url).map(p => ({ key: p.key, label: p.label, url: p.url })),
-        faltan: faltan.map(p => p.label),
         coche: prefill?.carTitle ?? null,
       };
 
@@ -315,6 +366,7 @@ export default function TramitesPanel({ requestId, token, runnerReport, onOrders
         <p className="text-d-dim text-xs mb-3">
           {impuestos?.desc || 'Presentamos y pagamos el modelo 576 y el IVTM del ayuntamiento.'}
           {' '}Se presentan con el coche ya comprado.
+          {money(impuestos?.amount_cents ?? null) && ` ${money(impuestos!.amount_cents)} (IVA incluido) son los honorarios del gestor; el importe del 576 y del IVTM va aparte.`}
         </p>
 
         {impuestosOrder && impuestosOrder.status !== 'pendiente_pago' ? (
@@ -329,6 +381,8 @@ export default function TramitesPanel({ requestId, token, runnerReport, onOrders
             </p>
             <ResultBlock order={impuestosOrder} />
           </div>
+        ) : !impReady.ready ? (
+          <Bloqueado readiness={impReady} runnerLink={runnerLink} />
         ) : (
           <>
             {/* El permiso aleman que el runner fotografio trae el CO2 (campo
@@ -370,6 +424,10 @@ export default function TramitesPanel({ requestId, token, runnerReport, onOrders
                         ['Clasificación CEE', lectura.campos.categoria_cee],
                         ['Km de utilización', lectura.km_utilizacion != null ? `${lectura.km_utilizacion.toLocaleString('es-ES')} km` : null],
                         ['Potencia', lectura.campos.potencia_kw != null ? `${lectura.campos.potencia_kw} kW` : null],
+                        ['Clase emisiones', lectura.campos.clase_emisiones ?? null],
+                        ['HSN · TSN', lectura.campos.hsn && lectura.campos.tsn ? `${lectura.campos.hsn} · ${lectura.campos.tsn}` : null],
+                        ['Plazas', lectura.campos.plazas != null ? String(lectura.campos.plazas) : null],
+                        ['Titulares ant.', lectura.campos.titulares_anteriores != null ? String(lectura.campos.titulares_anteriores) : null],
                       ] as const).map(([etiqueta, valor]) => (
                         <span key={etiqueta} className="flex gap-2">
                           <span className="text-d-dim w-[110px] shrink-0">{etiqueta}</span>
@@ -379,6 +437,11 @@ export default function TramitesPanel({ requestId, token, runnerReport, onOrders
                         </span>
                       ))}
                     </div>
+                    {lectura.campos.bastidor_coincide === false && (
+                      <p className="text-d-red font-medium flex items-start gap-1.5">
+                        <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" /> El bastidor del Teil I y el del Teil II no coinciden. No se tramita hasta aclararlo.
+                      </p>
+                    )}
                     {lectura.campos.notas && (
                       <p className="text-d-amber flex items-start gap-1.5">
                         <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" /> {lectura.campos.notas}
@@ -483,6 +546,7 @@ export default function TramitesPanel({ requestId, token, runnerReport, onOrders
         </div>
         <p className="text-d-dim text-xs mb-3">
           {ficha?.desc || 'Nuestro ingeniero firma la ficha reducida con las fotos de la inspección.'}
+          {money(ficha?.amount_cents ?? null) && ` ${money(ficha!.amount_cents)} por ficha, IVA incluido.`}
         </p>
 
         {fichaOrder && fichaOrder.status !== 'pendiente_pago' ? (
@@ -499,21 +563,11 @@ export default function TramitesPanel({ requestId, token, runnerReport, onOrders
           </div>
         ) : (
           <>
-            {!hayInforme ? (
-              <div className="rounded-lg border border-d-border/70 p-3.5">
-                <p className="text-[13px] text-d-text-2 flex items-start gap-2">
-                  <Camera className="w-4 h-4 text-d-dim shrink-0 mt-0.5" />
-                  <span>
-                    La ficha sale de las fotos de la inspección, así que se encarga en cuanto tu
-                    runner envíe su informe — con el coche todavía en Alemania. Aún no ha llegado.
-                  </span>
-                </p>
-              </div>
-            ) : (
-            <>
-            {/* El expediente sale del propio checklist del runner: aquí solo se
-                enseña qué fotos ya están y cuáles faltarían por repetir. */}
-            <div className="rounded-lg border border-d-border/70 p-3">
+            {/* El expediente sale del propio checklist del runner: aquí se enseña
+                qué fotos ya están y cuáles faltan. Mientras falte una obligatoria
+                el encargo queda bloqueado (también en la API). */}
+            {hayInforme && (
+            <div className="rounded-lg border border-d-border/70 p-3 mb-3">
               <p className="text-[11px] uppercase tracking-wide text-d-dim mb-2">Expediente de fotos</p>
               <div className="grid gap-1.5 sm:grid-cols-2">
                 {expediente.map(p => (
@@ -537,34 +591,25 @@ export default function TramitesPanel({ requestId, token, runnerReport, onOrders
                 ))}
               </div>
             </div>
-
-            {faltan.length > 0 && (
-              <p className="text-d-amber text-[13px] mt-3 flex items-start gap-1.5">
-                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-                <span>
-                  Faltan {faltan.length} foto{faltan.length === 1 ? '' : 's'} del expediente
-                  ({faltan.map(p => p.label).join(', ')}). Puedes encargarla igual: te las pediremos
-                  antes de firmar.
-                </span>
-              </p>
             )}
 
-            {ficha && !ficha.configured ? (
-              <p className="text-d-amber text-[13px] mt-3 flex items-center gap-1.5">
+            {!fichaReady.ready ? (
+              // Con informe, la lista de arriba ya dice qué foto falta.
+              <Bloqueado readiness={fichaReady} runnerLink={runnerLink} mostrarFaltan={!hayInforme} />
+            ) : ficha && !ficha.configured ? (
+              <p className="text-d-amber text-[13px] flex items-center gap-1.5">
                 <AlertTriangle className="w-4 h-4 shrink-0" /> Servicio aún no disponible para contratar.
               </p>
             ) : (
               <Button
                 onClick={() => encargar('ficha_reducida')}
                 disabled={ordering !== null}
-                className="d-btn-primary text-sm mt-3"
+                className="d-btn-primary text-sm"
               >
                 {ordering === 'ficha_reducida' && <Loader2 className="w-4 h-4 animate-spin mr-1.5" />}
                 {fichaOrder?.status === 'pendiente_pago' ? 'Continuar el pago' : 'Encargar y pagar'}
                 {money(ficha?.amount_cents ?? null) && ` · ${money(ficha!.amount_cents)}`}
               </Button>
-            )}
-            </>
             )}
           </>
         )}

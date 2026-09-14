@@ -3,9 +3,15 @@
 // IVTM) y el ingeniero que firma la ficha técnica reducida con las fotos que el
 // runner ya sacó en su inspección.
 //
-// Se cobran por encargo (Stripe one-off), no van en la cuota. El precio vive en
-// Stripe — aquí NUNCA se escribe un importe a mano para no desincronizarse; la
-// API lo lee del price y lo devuelve al cliente (ver /api/dealer/services).
+// Se cobran por encargo (Stripe one-off), no van en la cuota. El precio base es
+// `listPriceCents`: es lo que cobran nuestro gestor y nuestro ingeniero. Si hay
+// un price de Stripe en la variable de entorno manda ese (la API lo lee y lo
+// devuelve), y si no la API cobra este importe con price_data — el dealer ve
+// siempre el mismo numero que va a pagar (ver /api/dealer/services).
+//
+// Ninguno de los dos se puede encargar hasta que el runner haya subido las
+// fotos que el trabajo necesita: ver serviceReadiness al final. La UI enseña el
+// precio igualmente, y la API rechaza el encargo si falta algo.
 
 import { FICHA_PHOTOS, type GuidedPhoto } from './inspection-master';
 
@@ -37,8 +43,15 @@ export interface ServiceDef {
   desc: string;
   /** Qué recibe el dealer al final. */
   deliverable: string;
-  /** Price de Stripe (one-off). Sin él la ruta de checkout devuelve 500. */
+  /** Price de Stripe (one-off). Opcional: sin él se cobra listPriceCents. */
   priceEnv: string;
+  /** Lo que cobra el colaborador por operación, en céntimos, IVA incluido. */
+  listPriceCents: number;
+  /**
+   * Keys de fotos del expediente (FICHA_PHOTOS) sin las que no se puede
+   * trabajar. null = todas las obligatorias del expediente.
+   */
+  requiredPhotoKeys: string[] | null;
 }
 
 export const SERVICES: ServiceDef[] = [
@@ -49,6 +62,9 @@ export const SERVICES: ServiceDef[] = [
     desc: 'Presentamos y pagamos por ti el modelo 576 (impuesto de matriculación) y el IVTM del ayuntamiento donde se matricula el coche.',
     deliverable: 'Justificantes de pago del 576 y del IVTM, listos para la matriculación.',
     priceEnv: 'STRIPE_SERVICE_IMPUESTOS_PRICE_ID',
+    listPriceCents: 17900,
+    // El 576 sale del Teil I (CO2, fecha) y la matriculación exige el Teil II.
+    requiredPhotoKeys: ['doc_permiso', 'doc_teil2'],
   },
   {
     key: 'ficha_reducida',
@@ -57,6 +73,8 @@ export const SERVICES: ServiceDef[] = [
     desc: 'Con las fotos que tu runner ya sacó en la inspección, nuestro ingeniero redacta y firma la ficha técnica reducida del vehículo importado.',
     deliverable: 'Ficha técnica reducida firmada por ingeniero, en PDF.',
     priceEnv: 'STRIPE_SERVICE_FICHA_PRICE_ID',
+    listPriceCents: 5000,
+    requiredPhotoKeys: null,
   },
 ];
 
@@ -106,4 +124,30 @@ export function fichaExpediente(
 /** Fotos obligatorias del expediente que aún faltan (las `optional` no cuentan). */
 export function fichaMissing(expediente: FichaPhotoState[]): FichaPhotoState[] {
   return expediente.filter(p => !p.optional && !p.url);
+}
+
+export interface ServiceReadiness {
+  ready: boolean;
+  /** El runner aún no ha enviado la inspección. */
+  sinInforme: boolean;
+  /** Fotos necesarias que no están, por label (lo que ve el dealer). */
+  faltan: string[];
+}
+
+/**
+ * ¿Se puede encargar ya? Lo usan la UI (para bloquear y decir qué falta) y la
+ * API (para no cobrar un trabajo que no se puede hacer). Una sola regla.
+ */
+export function serviceReadiness(
+  kind: ServiceKey,
+  runnerReport: { submitted_at?: string | null; photos?: { label?: string; url?: string }[] } | null | undefined,
+): ServiceReadiness {
+  const expediente = fichaExpediente(runnerReport);
+  const required = serviceDef(kind)?.requiredPhotoKeys ?? null;
+  const faltan = (required
+    ? expediente.filter(p => required.includes(p.key) && !p.url)
+    : fichaMissing(expediente)
+  ).map(p => p.label);
+  const sinInforme = !runnerReport?.submitted_at;
+  return { ready: !sinInforme && faltan.length === 0, sinInforme, faltan };
 }

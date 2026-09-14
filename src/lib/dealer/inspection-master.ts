@@ -22,6 +22,8 @@ export interface GuidedPhoto {
    * inspeccion igual. Ver pendingInStep en el runner.
    */
   optional?: boolean;
+  /** Aviso destacado en la pantalla de la foto: qué se bloquea si falta. */
+  aviso?: string;
 }
 
 export interface GuidedItem {
@@ -61,13 +63,16 @@ export const GUIDED_STEPS: GuidedStep[] = [
     short: 'Documentos',
     intro: 'Antes de tocar el coche, papeles en mano. Si aquí algo no cuadra, no sigas.',
     photos: [
-      { key: 'doc_permiso', label: 'Documentación', hint: 'Permiso de circulación / Zulassungsbescheinigung con el VIN visible.', ficha: true },
+      // El label 'Documentación' se queda tal cual: los informes guardan las
+      // fotos por label y el expediente y la lectura del 576 cruzan por el.
+      { key: 'doc_permiso', label: 'Documentación', hint: 'Zulassungsbescheinigung Teil I (Fahrzeugschein, el papel pequeño que va en el coche). Ábrelo entero: la foto tiene que coger TODA la cara con las casillas, incluida la V.7 (CO2). Sin reflejos y que se lean los números.', ficha: true, aviso: 'Sin esta foto el concesionario no puede encargar los impuestos de matriculación ni la ficha técnica reducida: se le quedan bloqueados.' },
+      { key: 'doc_teil2', label: 'Documentación Teil II', hint: 'Zulassungsbescheinigung Teil II (Fahrzeugbrief, la hoja A4 grande). Es la que acredita la propiedad y sin el original no se matricula en España. Hoja entera, con el bastidor (E) y el titular visibles.', ficha: true, aviso: 'Sin esta foto el concesionario no puede encargar los impuestos de matriculación ni la ficha técnica reducida: se le quedan bloqueados.' },
       { key: 'doc_vin', label: 'VIN', hint: 'El VIN físico: base del parabrisas, marco de la puerta del conductor o vano motor.' },
       { key: 'doc_placa_fab', label: 'Placa del fabricante', hint: 'La placa remachada o pegada, en el marco de la puerta del conductor o en el vano motor. Tienen que leerse la homologación y las masas máximas por eje. La foto del VIN NO vale: son cosas distintas.', ficha: true },
     ],
     items: [
-      { id: 'doc_vin_match', title: 'VIN del coche = VIN de la documentación', hint: 'Compara carácter a carácter. Raspado, pegatina encima o un solo dígito distinto = fuera.' },
-      { id: 'doc_titular', title: 'El vendedor es el titular', hint: 'DNI del vendedor contra el titular del permiso. Si no coincide, que justifique por qué (herencia, autorización…).' },
+      { id: 'doc_vin_match', title: 'VIN del coche = VIN del Teil I = VIN del Teil II', hint: 'Casilla E en los dos papeles. Compara carácter a carácter. Raspado, pegatina encima o un solo dígito distinto = fuera.' },
+      { id: 'doc_titular', title: 'El vendedor es el titular', hint: 'DNI del vendedor contra el titular del Teil I (C.1) y el último titular del Teil II (C.6). Tienen que coincidir los dos. Si no, que justifique por qué (herencia, autorización…). Sin el Teil II original no hay compra.' },
       { id: 'doc_itv', title: 'ITV / TÜV vigente y sin defectos pendientes', hint: 'Mira fecha de validez y la lista de defectos del último informe.' },
       { id: 'doc_libro', title: 'Libro de mantenimiento con sellos coherentes', hint: 'Cuenta sellos e intervalos. Saltos de >40.000 km entre revisiones son mala señal.' },
       { id: 'doc_facturas', title: 'Facturas de mantenimiento disponibles', hint: 'Pide ver las últimas. Sellos sin factura del mismo taller = sospechoso.' },
